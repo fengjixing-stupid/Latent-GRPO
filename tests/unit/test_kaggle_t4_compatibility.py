@@ -13,6 +13,7 @@ class KaggleT4CompatibilityTests(unittest.TestCase):
             "transformers": "4.51.1",
             "sglang": "0.4.6.post1",
             "sgl-kernel": "0.1.0",
+            "compressed-tensors": "0.9.3",
             "flashinfer-python": "0.2.5+cu124torch2.6",
             "cuda-python": "12.9.0",
             "cuda-bindings": "12.9.0",
@@ -82,6 +83,15 @@ class KaggleT4CompatibilityTests(unittest.TestCase):
         report = self._assess(triton_version_ok=False, torchvision_version_ok=False)
         self.assertIn("runtime_version_mismatch:triton", report["blockers"])
         self.assertIn("runtime_version_mismatch:torchvision", report["blockers"])
+
+
+    def test_compressed_tensors_drift_fails_closed(self) -> None:
+        environment = self._environment()
+        environment["dependency_check_status"]["compressed-tensors"]["version"] = "0.13.0"
+        report = self._assess(environment=environment)
+        self.assertIn(
+            "runtime_version_mismatch:compressed-tensors:0.13.0", report["blockers"]
+        )
 
 
 if __name__ == "__main__":

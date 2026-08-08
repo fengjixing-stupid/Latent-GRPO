@@ -13,13 +13,15 @@ EXPECTED_T4_COMPUTE_CAPABILITY = "7.5"
 EXPECTED_PYTHON_PREFIX = "3.10"
 _REQUIRED_PACKAGES = (
     "torch", "ray", "transformers", "sglang", "sgl-kernel",
-    "flashinfer-python", "cuda-python", "cuda-bindings", "pyarrow",
+    "compressed-tensors", "flashinfer-python", "cuda-python",
+    "cuda-bindings", "pyarrow",
 )
 _EXPECTED_VERSION_PREFIXES = {
     "torch": "2.6.0",
     "transformers": "4.51.1",
     "sglang": "0.4.6.post1",
     "sgl-kernel": "0.1.0",
+    "compressed-tensors": "0.9.3",
     "flashinfer-python": "0.2.5",
     "cuda-python": "12.9.0",
     "cuda-bindings": "12.9.0",

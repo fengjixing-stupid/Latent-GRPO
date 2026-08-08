@@ -21,7 +21,7 @@ env/
 .env.*
 
 # Training outputs that should not enter Git
-models/
+/models/
 checkpoints/
 outputs/
 wandb/

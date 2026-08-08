@@ -151,6 +151,7 @@ def main(argv=None):
                 "transformers",
                 "sglang",
                 "sgl-kernel",
+                "compressed-tensors",
                 "flashinfer-python",
                 "cuda-python",
                 "cuda-bindings",

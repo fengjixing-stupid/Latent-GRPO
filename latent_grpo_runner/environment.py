@@ -26,6 +26,7 @@ _TARGET_PACKAGES = (
     "tensordict",
     "torchdata",
     "sglang",
+    "compressed-tensors",
     "sgl-kernel",
     "flash-attn",
     "flashinfer-python",

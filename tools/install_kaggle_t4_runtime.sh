@@ -60,6 +60,7 @@ torchaudio==2.6.0
 triton==3.2.0
 transformers==4.51.1
 sgl-kernel==0.1.0
+compressed-tensors==0.9.3
 flashinfer-python==0.2.5
 cuda-python==12.9.0
 cuda-bindings==12.9.0
@@ -82,7 +83,7 @@ grep -Ev '^(flashinfer-python|sgl-kernel|cuda-python|cuda-bindings|torchao)([<=>
 "${PYTHON_BIN}" -m pip install -e \
   "${ROOT}/Latent-GRPO/verl-0.4.x" --no-deps
 
-"${PYTHON_BIN}" -c 'import importlib.metadata as md, sys, torch, triton, torchvision, sgl_kernel, flashinfer; assert sys.version_info[:2] == (3, 10), sys.version; assert torch.__version__.startswith("2.6.0+cu124"), torch.__version__; assert torch.version.cuda == "12.4", torch.version.cuda; assert triton.__version__.startswith("3.2.0"), triton.__version__; assert torchvision.__version__.startswith("0.21.0+cu124"), torchvision.__version__; assert torch.cuda.is_available(); assert torch.cuda.device_count() == 2, torch.cuda.device_count(); assert all(torch.cuda.get_device_capability(i) == (7, 5) for i in range(2)); print("T4_BASE_RUNTIME: PASS"); print("python", sys.executable); print("torch", torch.__version__, "cuda", torch.version.cuda); print("triton", triton.__version__); print("torchvision", torchvision.__version__); print("sgl-kernel", md.version("sgl-kernel")); print("flashinfer-python", md.version("flashinfer-python")); print("cuda-python", md.version("cuda-python")); print("cuda-bindings", md.version("cuda-bindings"))'
+"${PYTHON_BIN}" -c 'import importlib.metadata as md, sys, torch, triton, torchvision, sgl_kernel, flashinfer; assert sys.version_info[:2] == (3, 10), sys.version; assert torch.__version__.startswith("2.6.0+cu124"), torch.__version__; assert torch.version.cuda == "12.4", torch.version.cuda; assert triton.__version__.startswith("3.2.0"), triton.__version__; assert torchvision.__version__.startswith("0.21.0+cu124"), torchvision.__version__; assert md.version("compressed-tensors").startswith("0.9.3"), md.version("compressed-tensors"); assert torch.cuda.is_available(); assert torch.cuda.device_count() == 2, torch.cuda.device_count(); assert all(torch.cuda.get_device_capability(i) == (7, 5) for i in range(2)); print("T4_BASE_RUNTIME: PASS"); print("python", sys.executable); print("torch", torch.__version__, "cuda", torch.version.cuda); print("triton", triton.__version__); print("torchvision", torchvision.__version__); print("sgl-kernel", md.version("sgl-kernel")); print("compressed-tensors", md.version("compressed-tensors")); print("flashinfer-python", md.version("flashinfer-python")); print("cuda-python", md.version("cuda-python")); print("cuda-bindings", md.version("cuda-bindings"))'
 
 echo "T4_RUNTIME_STACK_INSTALLED: ${VENV_DIR}; no training data read or generated"
 echo "NEXT: ${PYTHON_BIN} ${ROOT}/tools/probe_kaggle_p1_t4_compatibility.py"
