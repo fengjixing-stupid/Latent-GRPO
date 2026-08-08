@@ -24,7 +24,7 @@ class LauncherPlan:
     control_rank_only: bool
     target_status: str = "target_machine_test_deferred"
     metrics_enabled: bool = False
-    metrics_sink_status: str = "unavailable_with_reason:durable_parquet_sink_not_wired"
+    metrics_sink_status: str = "disabled"
 
     def as_dict(self) -> dict[str, object]:
         return {
@@ -60,6 +60,9 @@ def build_launcher_plan(config: ResolvedConfig) -> LauncherPlan:
         working_directory=working_directory,
         control_rank_only=config.launcher.mode == "torchrun_control",
         metrics_enabled=config.features.metrics_enabled,
+        metrics_sink_status=(
+            "driver_append_only_p0_ready" if config.features.metrics_enabled else "disabled"
+        ),
     )
 
 
@@ -74,6 +77,9 @@ def launch(
     runtime_environment = dict(os.environ if environment is None else environment)
     runtime_environment["LATENT_GRPO_OBSERVER_ENABLED"] = "1" if config.features.metrics_enabled else "0"
     runtime_environment["LATENT_GRPO_OBSERVER_OUTPUT_ROOT"] = str(config.paths["output_root"])
+    runtime_environment["LATENT_GRPO_OBSERVER_PROFILE_NAME"] = config.profile_name
+    runtime_environment["LATENT_GRPO_OBSERVER_SEED"] = str(config.training.seed)
+    runtime_environment["LATENT_GRPO_OBSERVER_CONFIG_HASH"] = config.resume_compatibility_hash
     if config.features.metrics_enabled:
         workspace_root = str(Path(__file__).resolve().parents[1])
         existing_pythonpath = runtime_environment.get("PYTHONPATH", "")
@@ -93,11 +99,6 @@ def launch(
             runtime_environment.pop(key, None)
     if run_command is not None:
         return int(run_command(plan.command, cwd=plan.working_directory, env=runtime_environment))
-    if config.features.metrics_enabled:
-        raise RuntimeError(
-            "metrics_enabled=true is unavailable: the durable AppendOnlyPartWriter/Stage1/2 Parquet sink "
-            "is not wired into upstream main_ppo; use --disable-metrics only for an explicitly uninstrumented smoke"
-        )
     completed = subprocess.run(
         plan.command,
         cwd=plan.working_directory,

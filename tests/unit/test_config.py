@@ -30,6 +30,14 @@ class ConfigTests(unittest.TestCase):
             config = load_config(ROOT / "configs" / f"{name}.yaml", workspace_root=ROOT)
             self.assertEqual(config.batch_arithmetic(), values)
 
+    def test_resume_compatibility_hash_excludes_only_resume_locator(self) -> None:
+        config = load_config(ROOT / "configs" / "smoke.yaml", workspace_root=ROOT)
+        resumed = config.with_runtime_overrides(
+            resume_from=Path("artifacts/runs/smoke/global_step_1")
+        )
+        self.assertNotEqual(config.config_hash, resumed.config_hash)
+        self.assertEqual(config.resume_compatibility_hash, resumed.resume_compatibility_hash)
+
     def test_unknown_field_is_rejected(self) -> None:
         contents = (ROOT / "configs" / "smoke.yaml").read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory() as temporary_directory:

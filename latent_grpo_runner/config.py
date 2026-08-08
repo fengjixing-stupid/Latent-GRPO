@@ -192,6 +192,21 @@ class ResolvedConfig:
             json.dumps(self._hashable_mapping(), sort_keys=True, separators=(",", ":")).encode("utf-8")
         ).hexdigest()
 
+    @property
+    def resume_compatibility_hash(self) -> str:
+        """Hash training semantics while excluding only the checkpoint locator.
+
+        A resumed run must be able to validate against the sidecar written by
+        the original run even though ``resume_from`` itself is necessarily a
+        new runtime locator.  Output root and all training/metrics semantics
+        remain hash-bound.
+        """
+        mapping = self._hashable_mapping()
+        mapping["resume_from"] = None
+        return hashlib.sha256(
+            json.dumps(mapping, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+
     def _hashable_mapping(self) -> dict[str, Any]:
         return {
             "profile_name": self.profile_name,

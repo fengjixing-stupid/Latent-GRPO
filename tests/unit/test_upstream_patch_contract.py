@@ -195,6 +195,29 @@ class UpstreamPatchContractTests(unittest.TestCase):
         finally:
             sys.path.remove(upstream_python)
 
+    def test_main_ppo_constructs_driver_sink_in_taskrunner_and_closes_it(self) -> None:
+        source = _source("verl-0.4.x/verl/trainer/main_ppo.py")
+        run_source = ast.get_source_segment(source, _function(source, "run"))
+        run_ppo_source = ast.get_source_segment(source, _function(source, "run_ppo"))
+        self.assertIn("create_observer_sink_from_env", run_source)
+        self.assertIn("observer_sink=observer_sink", run_source)
+        self.assertIn("observer_sink.close()", run_source)
+        self.assertIn("_latent_grpo_runtime_env_vars()", run_ppo_source)
+        self.assertIn("LATENT_GRPO_OBSERVER_", source)
+
+    def test_trainer_starts_observer_after_resume_and_checkpoints_before_latest_pointer(self) -> None:
+        source = _source("verl-0.4.x/verl/trainer/ppo/ray_trainer.py")
+        fit_source = ast.get_source_segment(source, _function(source, "fit"))
+        save_source = ast.get_source_segment(source, _function(source, "_save_checkpoint"))
+        load_index = fit_source.index("self._load_checkpoint()")
+        start_index = fit_source.index("start_run(", load_index)
+        validate_index = fit_source.index("self._validate()", start_index)
+        self.assertLess(load_index, start_index)
+        self.assertLess(start_index, validate_index)
+        sidecar_index = save_source.index("checkpoint_observer(")
+        latest_index = save_source.index("latest_checkpointed_iteration.txt")
+        self.assertLess(sidecar_index, latest_index)
+
     def test_topk_logits_are_concatenated_from_logits_not_ids(self) -> None:
         source = _source("verl-0.4.x/verl/workers/actor/dp_actor.py")
         function_source = ast.get_source_segment(source, _function(source, "compute_log_prob"))

@@ -76,14 +76,6 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    if config.features.metrics_enabled:
-        print(
-            "launch_blocked: metrics_enabled=true is unavailable until the durable "
-            "AppendOnlyPartWriter/Stage1/2 Parquet sink is wired into upstream main_ppo",
-            file=sys.stderr,
-        )
-        return 5
-
     target_report = collect_environment(
         mode="target",
         require_gpus=config.hardware.required_gpus,

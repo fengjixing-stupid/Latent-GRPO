@@ -16,6 +16,7 @@ Note that we don't combine the main with ray_trainer as ray_trainer is used by o
 """
 
 import hydra
+import os
 import ray
 
 from verl.trainer.ppo.ray_trainer import RayPPOTrainer
@@ -26,11 +27,31 @@ def main(config):
     run_ppo(config)
 
 
+def _latent_grpo_runtime_env_vars():
+    """Forward only launcher-owned observer metadata into the Ray TaskRunner."""
+    values = {
+        key: value
+        for key, value in os.environ.items()
+        if key.startswith("LATENT_GRPO_OBSERVER_")
+    }
+    if values and "PYTHONPATH" in os.environ:
+        values["PYTHONPATH"] = os.environ["PYTHONPATH"]
+    return values
+
+
 def run_ppo(config) -> None:
     if not ray.is_initialized():
         # this is for local ray cluster
         ray.init(
-            runtime_env={"env_vars": {"TOKENIZERS_PARALLELISM": "true", "NCCL_DEBUG": "WARN", "VLLM_LOGGING_LEVEL": "WARN", "VLLM_ALLOW_RUNTIME_LORA_UPDATING": "true"}},
+            runtime_env={
+                "env_vars": {
+                    "TOKENIZERS_PARALLELISM": "true",
+                    "NCCL_DEBUG": "WARN",
+                    "VLLM_LOGGING_LEVEL": "WARN",
+                    "VLLM_ALLOW_RUNTIME_LORA_UPDATING": "true",
+                    **_latent_grpo_runtime_env_vars(),
+                }
+            },
             num_cpus=config.ray_init.num_cpus,
         )
     runner = TaskRunner.remote()
@@ -135,23 +156,38 @@ class TaskRunner:
         train_dataset = create_rl_dataset(config.data.train_files, config.data, tokenizer, processor)
         val_dataset = create_rl_dataset(config.data.val_files, config.data, tokenizer, processor)
         train_sampler = create_rl_sampler(config.data, train_dataset)
-        trainer = RayPPOTrainer(
-            config=config,
-            tokenizer=tokenizer,
-            processor=processor,
-            role_worker_mapping=role_worker_mapping,
-            resource_pool_manager=resource_pool_manager,
-            ray_worker_group_cls=ray_worker_group_cls,
-            reward_fn=reward_fn,
-            val_reward_fn=val_reward_fn,
-            train_dataset=train_dataset,
-            val_dataset=val_dataset,
-            collate_fn=collate_fn,
-            train_sampler=train_sampler,
-            device_name=config.trainer.device,
-        )
-        trainer.init_workers()
-        trainer.fit()
+        observer_sink = None
+        if os.environ.get("LATENT_GRPO_OBSERVER_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}:
+            try:
+                from latent_grpo_runner.metrics.integration import create_observer_sink_from_env
+            except ImportError as error:
+                raise RuntimeError(
+                    "metrics_enabled=true requires latent_grpo_runner on the TaskRunner PYTHONPATH"
+                ) from error
+            observer_sink = create_observer_sink_from_env()
+
+        try:
+            trainer = RayPPOTrainer(
+                config=config,
+                tokenizer=tokenizer,
+                processor=processor,
+                role_worker_mapping=role_worker_mapping,
+                resource_pool_manager=resource_pool_manager,
+                ray_worker_group_cls=ray_worker_group_cls,
+                reward_fn=reward_fn,
+                val_reward_fn=val_reward_fn,
+                train_dataset=train_dataset,
+                val_dataset=val_dataset,
+                collate_fn=collate_fn,
+                train_sampler=train_sampler,
+                device_name=config.trainer.device,
+                observer_sink=observer_sink,
+            )
+            trainer.init_workers()
+            trainer.fit()
+        finally:
+            if observer_sink is not None:
+                observer_sink.close()
 
 
 def create_rl_dataset(data_paths, data_config, tokenizer, processor):

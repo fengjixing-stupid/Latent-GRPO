@@ -46,10 +46,17 @@ class LauncherTests(unittest.TestCase):
         launch(config, run_command=fake_run, environment={})
         self.assertEqual(seen[0]["LATENT_GRPO_OBSERVER_ENABLED"], "1")
 
-    def test_real_metrics_launch_fails_before_starting_without_parquet_sink(self) -> None:
+    def test_real_metrics_launch_reaches_upstream_process_with_durable_sink_metadata(self) -> None:
         config = load_config(ROOT / "configs" / "smoke.yaml", workspace_root=ROOT)
-        with self.assertRaisesRegex(RuntimeError, "durable AppendOnlyPartWriter/Stage1/2 Parquet sink"):
-            launch(config, environment={})
+        completed = type("Completed", (), {"returncode": 0})()
+        with patch("latent_grpo_runner.distributed.subprocess.run", return_value=completed) as run:
+            self.assertEqual(launch(config, environment={}), 0)
+        kwargs = run.call_args.kwargs
+        self.assertEqual(kwargs["env"]["LATENT_GRPO_OBSERVER_ENABLED"], "1")
+        self.assertEqual(kwargs["env"]["LATENT_GRPO_OBSERVER_PROFILE_NAME"], "smoke")
+        self.assertEqual(kwargs["env"]["LATENT_GRPO_OBSERVER_SEED"], "17")
+        self.assertEqual(kwargs["env"]["LATENT_GRPO_OBSERVER_CONFIG_HASH"], config.resume_compatibility_hash)
+        self.assertEqual(build_launcher_plan(config).metrics_sink_status, "driver_append_only_p0_ready")
 
     def test_default_launcher_is_single_ray_direct_driver(self) -> None:
         config = load_config(ROOT / "configs" / "3gpu-low.yaml", workspace_root=ROOT)

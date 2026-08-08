@@ -964,6 +964,18 @@ class RayPPOTrainer:
         dataloader_state_dict = self.train_dataloader.state_dict()
         torch.save(dataloader_state_dict, dataloader_local_path)
 
+        # The metrics sidecar is part of checkpoint publication.  Publish it
+        # before advancing the upstream latest-checkpoint pointer so a failed
+        # metrics commit cannot make an incomplete checkpoint authoritative.
+        if self._latent_grpo_observer is not None and self._latent_grpo_observer.enabled:
+            checkpoint_observer = getattr(self._latent_grpo_observer, "checkpoint", None)
+            if not callable(checkpoint_observer):
+                raise RuntimeError("enabled durable observer is missing checkpoint lifecycle hook")
+            checkpoint_observer(
+                global_step=int(self.global_steps),
+                checkpoint_dir=local_global_step_folder,
+            )
+
         # latest checkpointed iteration tracker (for atomic usage)
         local_latest_checkpointed_iteration = os.path.join(self.config.trainer.default_local_dir, "latest_checkpointed_iteration.txt")
         with open(local_latest_checkpointed_iteration, "w") as f:
@@ -1055,6 +1067,13 @@ class RayPPOTrainer:
 
         # load checkpoint before doing anything
         self._load_checkpoint()
+        if self._latent_grpo_observer is not None and self._latent_grpo_observer.enabled:
+            start_run = getattr(self._latent_grpo_observer, "start_run", None)
+            if not callable(start_run):
+                raise RuntimeError("enabled durable observer is missing start_run lifecycle hook")
+            start_run(
+                resume_checkpoint_step=(self.global_steps if self.global_steps > 0 else None)
+            )
 
         # perform validation before training
         # currently, we only support validation using the reward_function.
