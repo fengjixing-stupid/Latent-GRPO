@@ -1,0 +1,13 @@
+version: 0.1
+project:
+  name: "Latent-GRPO"
+  summary: "用于优化词表空间隐式推理的 GRPO 强化学习框架。"
+cairn:
+  knowledge_dir: "cairn"
+  skill_spec_date: "2026-07-16"
+  git_policy: "track"
+  language: "zh"
+graduation:
+  provider: none
+history:
+  migration_mode: "start_fresh"

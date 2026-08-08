@@ -1,0 +1,13 @@
+# CANDIDATE ONLY -- target_machine_test_deferred
+# Target: CPython 3.11.x / Linux / official PyTorch CUDA 12.4 wheel family.
+# This is not a verified lock and must not be labelled requirements_lock_verified.
+torch==2.6.0
+torchvision==0.21.0
+transformers==4.51.1
+flashinfer-python==0.2.3
+flash-attn==2.7.3
+
+# Deliberately not pinned here pending target probes:
+# ray, numpy, pyarrow, tensordict, torchdata, sgl-kernel.
+# System driver, CUDA toolkit, NCCL, cuDNN, GCC and glibc are not Python
+# requirements and must never be added to this file.

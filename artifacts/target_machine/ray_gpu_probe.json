@@ -1,0 +1,12 @@
+{
+  "command": ["bash", "scripts/target_machine/05_probe_ray_gpus.sh"],
+  "started_at": null,
+  "finished_at": null,
+  "exit_code": null,
+  "status": "target_machine_test_deferred",
+  "environment_summary": {"required_ray_gpu_workers": 3, "launcher_mode": "ray_direct"},
+  "stdout_log_path": "artifacts/target_machine/logs/05_probe_ray_gpus.stdout.log",
+  "stderr_log_path": "artifacts/target_machine/logs/05_probe_ray_gpus.stderr.log",
+  "artifacts": ["artifacts/target_machine/ray_gpu_probe_details.json"],
+  "failure_reason": "not_executed_on_target_machine"
+}

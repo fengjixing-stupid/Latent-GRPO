@@ -1,0 +1,6 @@
+# Reward/data utilities used by the author's math profiles and scorer imports.
+# Kept as a separate group so non-math deployments can audit it independently.
+math-verify
+mathruler
+pylatexenc
+pyext

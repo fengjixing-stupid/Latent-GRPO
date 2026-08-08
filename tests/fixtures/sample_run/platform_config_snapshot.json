@@ -1,0 +1,6 @@
+{
+  "cuda_available": false,
+  "status": "mac_development_check_passed",
+  "target_gpu_environment_available": false,
+  "training_runtime_validation": "target_machine_test_deferred"
+}

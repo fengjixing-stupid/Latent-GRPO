@@ -1,0 +1,12 @@
+{
+  "command": ["bash", "scripts/target_machine/00_probe_environment.sh"],
+  "started_at": null,
+  "finished_at": null,
+  "exit_code": null,
+  "status": "target_machine_test_deferred",
+  "environment_summary": {"expected_platform": "Linux", "required_gpus": 3, "min_vram_gb": 40},
+  "stdout_log_path": "artifacts/target_machine/logs/00_probe_environment.stdout.log",
+  "stderr_log_path": "artifacts/target_machine/logs/00_probe_environment.stderr.log",
+  "artifacts": ["artifacts/target_machine/runtime_probe_details.json"],
+  "failure_reason": "not_executed_on_target_machine"
+}

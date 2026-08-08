@@ -1,0 +1,23 @@
+{
+  "command": ["bash", "scripts/target_machine/11_collect_reports.sh"],
+  "started_at": null,
+  "finished_at": null,
+  "exit_code": null,
+  "status": "target_machine_test_deferred",
+  "environment_summary": {"expected_report_count": 9},
+  "stdout_log_path": "artifacts/target_machine/logs/11_collect_reports.stdout.log",
+  "stderr_log_path": "artifacts/target_machine/logs/11_collect_reports.stderr.log",
+  "artifacts": ["artifacts/target_machine/"],
+  "failure_reason": "not_executed_on_target_machine",
+  "expected_reports": [
+    "runtime_probe.json",
+    "import_check.json",
+    "ray_gpu_probe.json",
+    "single_gpu_smoke.json",
+    "single_gpu_output_validation.json",
+    "three_gpu_smoke.json",
+    "three_gpu_output_validation.json",
+    "resume_smoke.json",
+    "requirements_validation.json"
+  ]
+}

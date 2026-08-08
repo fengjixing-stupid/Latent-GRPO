@@ -1,0 +1,9 @@
+{
+  "format_version": "target_inventory_v1",
+  "canonical_sources": [
+    "spec/target_variables.md",
+    "docs/requirements_traceability_matrix.md"
+  ],
+  "record_semantics": "Runtime builder emits one entry per RTM table-qualified target field and cross-checks target_variables core-count/unique-field extraction.",
+  "pyarrow_roundtrip_status": "target_machine_test_deferred"
+}

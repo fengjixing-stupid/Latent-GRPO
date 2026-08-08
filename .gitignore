@@ -1,0 +1,31 @@
+# macOS
+.DS_Store
+__MACOSX/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Environment / secrets
+.env
+.env.*
+
+# Training outputs that should not enter Git
+models/
+checkpoints/
+outputs/
+wandb/
+
+# Temporary files
+*.log
+*.tmp

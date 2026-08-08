@@ -1,0 +1,12 @@
+{
+  "command": ["bash", "scripts/target_machine/06_single_gpu_smoke.sh"],
+  "started_at": null,
+  "finished_at": null,
+  "exit_code": null,
+  "status": "target_machine_test_deferred",
+  "environment_summary": {"visible_gpus": [0], "max_steps": 2},
+  "stdout_log_path": "artifacts/target_machine/logs/06_single_gpu_smoke.stdout.log",
+  "stderr_log_path": "artifacts/target_machine/logs/06_single_gpu_smoke.stderr.log",
+  "artifacts": ["artifacts/target_machine/runs/single_gpu", "artifacts/target_machine/single_gpu_memory.json"],
+  "failure_reason": "not_executed_on_target_machine"
+}

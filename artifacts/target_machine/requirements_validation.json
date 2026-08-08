@@ -1,0 +1,12 @@
+{
+  "command": ["bash", "scripts/target_machine/04_import_check.sh"],
+  "started_at": null,
+  "finished_at": null,
+  "exit_code": null,
+  "status": "target_machine_test_deferred",
+  "environment_summary": {"constraints_status": "candidate_only"},
+  "stdout_log_path": "artifacts/target_machine/logs/04_pip_check.stdout.log",
+  "stderr_log_path": "artifacts/target_machine/logs/04_pip_check.stderr.log",
+  "artifacts": ["constraints/linux-cu124-py311.txt"],
+  "failure_reason": "not_executed_on_target_machine"
+}

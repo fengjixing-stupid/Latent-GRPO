@@ -1,0 +1,63 @@
+schema_version: 1
+profile_name: 3gpu-high-smoke
+profile_kind: engineering_target_smoke
+description: Three-GPU 7B chain smoke; target-machine validation required and not a paper reproduction.
+launcher:
+  mode: ray_direct
+target_hardware:
+  required_gpus: 3
+  min_vram_gb: 40
+batch:
+  prompt_batch: 3
+  rollout_n: 4
+  mini_prompt_batch: 3
+  actor_micro_batch_per_gpu: 1
+  rollout_log_prob_micro_batch_per_gpu: 1
+  ref_log_prob_micro_batch_per_gpu: 1
+  ppo_epochs: 1
+model:
+  path: DJCheng/Qwen2.5-Math-7B-Latent-SFT-4k-Top10
+  latent_end_token_id: 522
+  latent_end_token: <|latent_end|>
+  latent_end_source: profile_candidate_requires_target_tokenizer_validation
+  use_remove_padding: true
+  enable_gradient_checkpointing: true
+  actor_param_offload: true
+  actor_optimizer_offload: true
+  ref_param_offload: true
+  use_kl_loss: true
+data:
+  train_files: data/DAPO-Math-17k-en-train.parquet
+  val_files: data/Math-500-test.parquet
+  max_prompt_length: 512
+  max_response_length: 256
+rollout:
+  name: sglang
+  dtype: bfloat16
+  tensor_parallel_size: 1
+  sequence_parallel_size: 1
+  max_model_len: 1024
+  max_num_batched_tokens: 1024
+  gpu_memory_utilization: 0.50
+  max_topk: 10
+  temperature: 0.6
+  top_p: 0.95
+  top_k: 30
+  gumbel_softmax_temperature: 1.0
+  noise_scale: 1.0
+  enable_latent: true
+  add_noise_gumbel_softmax: true
+  use_one_sided_gumbel_noise: true
+training:
+  max_steps: 1
+  seed: 17
+  filter_groups_max_num_gen_batches: 50
+paths:
+  upstream_repo_path: Latent-GRPO
+  output_root: artifacts/runs/3gpu-high-smoke
+  cache_root: cache
+features:
+  metrics_enabled: true
+  support_enabled: false
+  checkpoint_probe_enabled: false
+  credit_probe_enabled: false

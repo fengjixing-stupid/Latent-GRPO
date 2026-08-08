@@ -1,0 +1,27 @@
+{
+  "package_name": "latent_grpo_codex_prompt_package",
+  "upstream_repo_relative_path": "./Latent-GRPO",
+  "target_environment": {
+    "os": "Linux",
+    "surface": "VSCode Remote",
+    "docker": false,
+    "gpu_count": 3,
+    "approx_vram_gb_per_gpu": 46,
+    "launcher": "torchrun"
+  },
+  "read_order": [
+    "./spec/00_START_HERE.md",
+    "./spec/01_CODEX_MASTER_PROMPT.md",
+    "./spec/02_SYSTEM_AND_IMPLEMENTATION_CONTRACT.md",
+    "./spec/03_METRICS_STORAGE_CONTRACT.md",
+    "./spec/04_AGENT_ORCHESTRATION.md",
+    "./spec/05_VALIDATION_AND_DELIVERABLES.md",
+    "./spec/target_variables.md"
+  ],
+  "spec_directory_relative_path": "./spec",
+  "target_variables_relative_path": "./spec/target_variables.md",
+  "project_root_layout": {
+    "upstream_repo": "./Latent-GRPO",
+    "spec_directory": "./spec"
+  }
+}

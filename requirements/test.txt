@@ -1,0 +1,2 @@
+# Mac-safe unit/integration development dependencies only.
+pytest

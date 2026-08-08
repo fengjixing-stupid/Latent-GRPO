@@ -1,0 +1,12 @@
+{
+  "command": ["bash", "scripts/target_machine/08_three_gpu_smoke.sh"],
+  "started_at": null,
+  "finished_at": null,
+  "exit_code": null,
+  "status": "target_machine_test_deferred",
+  "environment_summary": {"visible_gpus": [0, 1, 2], "launcher_mode": "ray_direct", "max_steps": 2},
+  "stdout_log_path": "artifacts/target_machine/logs/08_three_gpu_smoke.stdout.log",
+  "stderr_log_path": "artifacts/target_machine/logs/08_three_gpu_smoke.stderr.log",
+  "artifacts": ["artifacts/target_machine/runs/three_gpu", "artifacts/target_machine/three_gpu_memory.json"],
+  "failure_reason": "not_executed_on_target_machine"
+}

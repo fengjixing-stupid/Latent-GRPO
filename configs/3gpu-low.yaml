@@ -1,0 +1,63 @@
+schema_version: 1
+profile_name: 3gpu-low
+profile_kind: engineering_target_smoke
+description: Three-GPU low-risk candidate; target-machine validation required and not a paper reproduction.
+launcher:
+  mode: ray_direct
+target_hardware:
+  required_gpus: 3
+  min_vram_gb: 40
+batch:
+  prompt_batch: 6
+  rollout_n: 4
+  mini_prompt_batch: 3
+  actor_micro_batch_per_gpu: 2
+  rollout_log_prob_micro_batch_per_gpu: 2
+  ref_log_prob_micro_batch_per_gpu: 2
+  ppo_epochs: 1
+model:
+  path: DJCheng/LLaMA3.2-1B-Instruct-Latent-SFT-Top10
+  latent_end_token_id: 524
+  latent_end_token: <|latent_end|>
+  latent_end_source: profile_candidate_requires_target_tokenizer_validation
+  use_remove_padding: true
+  enable_gradient_checkpointing: false
+  actor_param_offload: false
+  actor_optimizer_offload: false
+  ref_param_offload: false
+  use_kl_loss: false
+data:
+  train_files: data/GSM8k-Aug-oss-dup-all.parquet
+  val_files: data/GSM8k-Aug-test.parquet
+  max_prompt_length: 192
+  max_response_length: 128
+rollout:
+  name: sglang
+  dtype: bfloat16
+  tensor_parallel_size: 1
+  sequence_parallel_size: 1
+  max_model_len: 512
+  max_num_batched_tokens: 512
+  gpu_memory_utilization: 0.50
+  max_topk: 10
+  temperature: 0.6
+  top_p: 0.95
+  top_k: 30
+  gumbel_softmax_temperature: 1.0
+  noise_scale: 1.0
+  enable_latent: true
+  add_noise_gumbel_softmax: true
+  use_one_sided_gumbel_noise: true
+training:
+  max_steps: 2
+  seed: 17
+  filter_groups_max_num_gen_batches: 50
+paths:
+  upstream_repo_path: Latent-GRPO
+  output_root: artifacts/runs/3gpu-low
+  cache_root: cache
+features:
+  metrics_enabled: true
+  support_enabled: false
+  checkpoint_probe_enabled: false
+  credit_probe_enabled: false

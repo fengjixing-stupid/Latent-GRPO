@@ -1,0 +1,3646 @@
+{
+  "allowed_statuses": [
+    "blocked",
+    "cuda_runtime_verified",
+    "implemented",
+    "mac_development_check_passed",
+    "memory_feasibility_verified",
+    "requirements_lock_verified",
+    "single_gpu_tested",
+    "static_check_passed",
+    "synthetic_test_passed",
+    "target_machine_probe_passed",
+    "target_machine_test_deferred",
+    "three_gpu_ray_tested",
+    "unavailable_with_reason"
+  ],
+  "ambiguous_tokens": [],
+  "blocked_fields": 23,
+  "coverage_is_acceptance_ready": false,
+  "coverage_limit_reason": "target_variables.md supplies authoritative unique field names; table qualification is supplied and inventoried by the RTM",
+  "coverage_mode": "rtm_table_qualified_with_spec_unique_crosscheck",
+  "extra_in_rtm": [
+    "<family>_available",
+    "<family>_unavailable_reason",
+    "<metric_name>__available",
+    "<metric_name>__unavailable_reason",
+    "numerator_count"
+  ],
+  "implemented_fields": 0,
+  "inventory": [
+    {
+      "declared": true,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "metric_scope",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "global_step",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "optimizer_step",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "observation_phase",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "learning_rate",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "wall_clock_seconds",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "cumulative_train_samples",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "cumulative_rollout_tokens",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "cumulative_gpu_hours",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_available",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_unavailable_reason",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "aggregation_worker_count",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_version",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "is_resume_run",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "resume_from_step",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "metrics_compute_time",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "metrics_write_time",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "train/policy_loss",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "train/entropy",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "train/kl",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "train/clip_fraction",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "train/importance_ratio_mean",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "train/importance_ratio_std",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "train/response_length",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "train/latent_length",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "train/generated_token_count",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "train/step_time",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "entropy_source",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "entropy_probability_space",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "entropy_mask_definition",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "entropy_definition_version",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "response_length_definition_version",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "latent_length_definition_version",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "length_counting_rule_version",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "generated_token_count_definition_version",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "generated_token_count_scope",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "train_core_available",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "train_core_unavailable_reason",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "mixture/effective_k_noisy",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "mixture/top1_weight_noisy",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "mixture/noisy_count",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "mixture_available",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "mixture_unavailable_reason",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "mask/zero_advantage_rate",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "mask/eligible_latent_token_count",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "mask_available",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "mask_unavailable_reason",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "signal/reward_mean",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "signal/reward_std",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "signal/advantage_std",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "signal/reward_count",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "signal/advantage_count",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "signal_available",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "signal_unavailable_reason",
+      "implemented": false,
+      "storage_table": "train_step_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "eval_dataset_name",
+      "implemented": false,
+      "storage_table": "eval_dataset_manifest.parquet",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "eval_dataset_version",
+      "implemented": false,
+      "storage_table": "eval_dataset_manifest.parquet",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "question_id",
+      "implemented": false,
+      "storage_table": "eval_dataset_manifest.parquet",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "prompt_hash",
+      "implemented": false,
+      "storage_table": "eval_dataset_manifest.parquet",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "reference_answer",
+      "implemented": false,
+      "storage_table": "eval_dataset_manifest.parquet",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "reference_answer_hash",
+      "implemented": false,
+      "storage_table": "eval_dataset_manifest.parquet",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "global_step",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "checkpoint_step",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "observation_phase",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "question_id",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "generation_id",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "predicted_answer",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "reference_answer",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "reference_answer_hash",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "is_correct",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "response_length",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "latent_length",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "is_valid_response",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "generation_failure_reason",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "reward_or_score",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "prompt_hash",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "generation_seed",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "length_counting_rule_version",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "evaluation_rule_version",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "eval_dataset_version",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "clean_topk_available",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "clean_topk_unavailable_reason",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_available",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_unavailable_reason",
+      "implemented": false,
+      "storage_table": "eval_question_results",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "global_step",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "checkpoint_step",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "observation_phase",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "question_id",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "generation_id",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "latent_position",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "clean_topk_token_ids",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "clean_topk_probs",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "clean_topk_k",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "clean_topk_available",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "clean_topk_unavailable_reason",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "clean_topk_source",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_available",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_unavailable_reason",
+      "implemented": false,
+      "storage_table": "eval_clean_topk",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "diagnostic_run_id",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "diagnostic_batch_index",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel_diagnostics_enabled",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel_diagnostics_mode",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel/raw_mean",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel/raw_std",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel/lower_clip_rate",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel/upper_clip_rate",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel/zero_rate",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel/raw_count",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel/one_sided_count",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel_compute_time_seconds",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_available",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_unavailable_reason",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel_available",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "gumbel_unavailable_reason",
+      "implemented": false,
+      "storage_table": "gumbel_diagnostics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "global_step",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "optimizer_step",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "observation_phase",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group_id",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "prompt_id_or_hash",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group/trajectory_count",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group/correct_trajectory_count",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group/non_correct_trajectory_count",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group/overlong_trajectory_count",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group/overlong_generated_token_count",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group/overlong_response_length_max",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group/zero_variance_reward",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "optimal_correct_trajectory_id",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "optimal_correct_mean_old_log_prob",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group_definition_version",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "trajectory_classification_version",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "overlong_definition_version",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_available",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_unavailable_reason",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group_available",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group_unavailable_reason",
+      "implemented": false,
+      "storage_table": "train_group_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_definition_version",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_start_step",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_interval_steps",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_observation_phase",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_current_policy_timepoint",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "rollout_topk_source",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "pre_update_topk_source",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "trajectory_score_name",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "trajectory_score_formula",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_include_correct",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_include_non_correct",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_exclude_overlong",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_requires_remove_padding",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "latent_position_rule_version",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "platform_config_hash",
+      "implemented": false,
+      "storage_table": "support_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "global_step",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "optimizer_step_at_observation",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "observation_phase",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "group_id",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "trajectory_id",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "trajectory_class",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "trajectory_mean_old_log_prob",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "trajectory_selection_rule_version",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "candidate_trajectory_count",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support/retention_rate",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "support/top1_retention_rate",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "support/effective_position_count",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "record_available",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_unavailable_reason",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support_available",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support_unavailable_reason",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_version",
+      "implemented": false,
+      "storage_table": "support_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "global_step",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "optimizer_step_at_observation",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "observation_phase",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support_extra_time_seconds",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support_cache_peak_bytes",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support_selected_trajectory_count",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support_candidate_trajectory_count",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support_benchmark/total_effective_position_count",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_available",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_unavailable_reason",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support_available",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "support_unavailable_reason",
+      "implemented": false,
+      "storage_table": "support_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_definition_version",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_batch_id",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_prompt_ids",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_generation_seed",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_gumbel_seed",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_sampling_parameters",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_batch_size",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_trajectories_per_prompt",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_max_trajectories",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_max_latent_positions",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_use_independent_rng",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_restore_training_rng",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_performs_optimizer_step",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_reward_manager_source",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_reward_scorer_source",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_group_construction_source",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_advantage_function_source",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_response_mask_source",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_first_token_selection_source",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_old_log_prob_timepoint",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "onesided_probe_enabled",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "credit_probe_enabled",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "credit_alignment_probe_enabled",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "platform_config_hash",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "checkpoint_probe_enabled",
+      "implemented": false,
+      "storage_table": "probe_definition.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "global_step",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "optimizer_step",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "checkpoint_step",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "observation_phase",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_batch_id",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_definition_version",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "trajectory_group",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "latent_position_group",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided/delta_mean",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided/delta_std",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided/delta_p05",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided/delta_min",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided/delta_negative_rate",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided/delta_near_zero_rate",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided/flipgrad_rate",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided/delta_count",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided/flipgrad_count",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/top1_share",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/effective_k",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/weight_credit_spearman",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/surrogate_alignment_rate",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/concentration_count",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/spearman_count",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/alignment_count",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_available",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_unavailable_reason",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided_available",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "onesided_unavailable_reason",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit_concentration_available",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit_concentration_unavailable_reason",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit_spearman_available",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit_spearman_unavailable_reason",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit_alignment_available",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit_alignment_unavailable_reason",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/weight_credit_spearman__available",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/weight_credit_spearman__unavailable_reason",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/surrogate_alignment_rate__available",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit/surrogate_alignment_rate__unavailable_reason",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_rng_restore_succeeded",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_version",
+      "implemented": false,
+      "storage_table": "probe_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "global_step",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "optimizer_step",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "blocked"
+    },
+    {
+      "declared": true,
+      "field_name": "checkpoint_step",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "observation_phase",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_extra_time_seconds",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_peak_memory_bytes",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_effective_prompt_count",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_effective_trajectory_count",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_effective_latent_position_count",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit_probe_enabled",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "credit_alignment_probe_enabled",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_rng_restore_succeeded",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_available",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "record_unavailable_reason",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_benchmark_available",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": true,
+      "field_name": "probe_benchmark_unavailable_reason",
+      "implemented": false,
+      "storage_table": "probe_benchmark_metrics",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "profile_name",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "seed",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "train_batch_size",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "rollout_batch_size",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "ppo_mini_batch_size",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "ppo_micro_batch_size_per_gpu",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "rollout_micro_batch_size_per_gpu",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "gradient_accumulation_steps",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "rollout_n",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "ppo_epochs",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "base_learning_rate",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "optimizer_name",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "lr_scheduler_name",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "warmup_steps",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "weight_decay",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "max_grad_norm",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "ppo_clip_ratio",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "entropy_coeff",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "kl_coeff",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "gamma",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "gae_lambda",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "top_k",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "top_p",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "sampling_temperature",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "gumbel_temperature",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "gumbel_noise_scale",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "gumbel_clip_lower",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "gumbel_clip_upper",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "one_sided_gumbel_noise_offset",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "use_one_sided_noise",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "use_flipgrad",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "use_first_token_selection",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "max_prompt_length",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "max_response_length",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "max_latent_length",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "overlong_sample_policy",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "model_name_or_path",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "dataset_name",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "eval_dataset_name",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "eval_generations_per_question",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "world_size",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "num_gpus",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "tensor_parallel_size",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "sequence_parallel_size",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "dtype",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "gradient_checkpointing",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "remove_padding",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "configured_total_steps",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "test_steps",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "metrics_enabled",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "metrics_schema_version",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "metrics_log_interval_steps",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "flush_interval_records",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "output_format",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "fail_training_on_logging_error",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "save_jsonl_debug_copy",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "platform_config_path",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "platform_config_hash",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "execution_surface",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "workspace_fingerprint",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "python_executable_fingerprint",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "python_environment_kind",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "runtime_environment_fingerprint",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "runtime_environment_fingerprint_available",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "runtime_environment_fingerprint_unavailable_reason",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "resolved_launch_command_redacted",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "platform_detector_version",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "platform_detection_mode",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "platform_detection_status",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "dependency_check_status",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "runtime_tensor_probe_status",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "runtime_provenance_verified",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "data_classification",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "safe_to_share",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "execution_scope",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "network_access_performed",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "workspace_external_scan_performed",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "privileged_operations_performed",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "automatic_installation_performed",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "secret_redaction_applied",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "platform_security_check_status",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "response_length_definition_version",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "latent_length_definition_version",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "generated_token_count_definition_version",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "generated_token_count_scope",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "length_counting_rule_version",
+      "implemented": false,
+      "storage_table": "run_config.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "rollout_noisy_topk_token_ids",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "rollout_perturbed_topk_scores",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "noisy_mixture_weights",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "pre_update_topk_token_ids",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "blocked"
+    },
+    {
+      "declared": false,
+      "field_name": "reward",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "advantage",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "surrogate_margin",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "flipgrad_trigger_mask",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "component_log_prob",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "blocked"
+    },
+    {
+      "declared": false,
+      "field_name": "u_i",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "blocked"
+    },
+    {
+      "declared": false,
+      "field_name": "q_i",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "blocked"
+    },
+    {
+      "declared": false,
+      "field_name": "valid_latent_position_mask",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "blocked"
+    },
+    {
+      "declared": false,
+      "field_name": "valid_latent_component_mask",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "blocked"
+    },
+    {
+      "declared": false,
+      "field_name": "eligible_latent_mask",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "zero_advantage_mask",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "zero_advantage_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "eligible_latent_token_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "raw_sum",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "raw_sum_sq",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "raw_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "lower_clip_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "upper_clip_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "one_sided_zero_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "one_sided_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "intersection_fraction_sum",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "top1_retained_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "effective_position_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "selected_non_correct_trajectory_id",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "selected_non_correct_mean_old_log_prob",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "near_zero_mask",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "negative_mask",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "group_definition_version",
+      "implemented": false,
+      "storage_table": "schema_manifest.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "trajectory_classification_version",
+      "implemented": false,
+      "storage_table": "schema_manifest.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "overlong_definition_version",
+      "implemented": false,
+      "storage_table": "schema_manifest.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "support_definition_version",
+      "implemented": false,
+      "storage_table": "schema_manifest.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "probe_definition_version",
+      "implemented": false,
+      "storage_table": "schema_manifest.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "credit_definition_version",
+      "implemented": false,
+      "storage_table": "schema_manifest.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "surrogate_alignment_definition_version",
+      "implemented": false,
+      "storage_table": "schema_manifest.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "evaluation_rule_version",
+      "implemented": false,
+      "storage_table": "schema_manifest.json",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "<family>_available",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "<family>_unavailable_reason",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "<metric_name>__available",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "<metric_name>__unavailable_reason",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "sum",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "sum_sq",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "count",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "nan_count",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "masked_count",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "min",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "max",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "numerator_count",
+      "implemented": false,
+      "storage_table": "schema_manifest_or_memory_only",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "trajectory_class",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "is_overlong_or_truncated_by_length",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "blocked"
+    },
+    {
+      "declared": false,
+      "field_name": "negative_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "near_zero_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "flipgrad_trigger_count",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "target_machine_test_deferred"
+    },
+    {
+      "declared": false,
+      "field_name": "component_log_probs",
+      "implemented": false,
+      "storage_table": "memory_only_not_persisted",
+      "test_status": "blocked"
+    }
+  ],
+  "missing_fields": [],
+  "missing_from_rtm": [],
+  "rtm_unique_fields": [
+    "<family>_available",
+    "<family>_unavailable_reason",
+    "<metric_name>__available",
+    "<metric_name>__unavailable_reason",
+    "advantage",
+    "aggregation_worker_count",
+    "automatic_installation_performed",
+    "base_learning_rate",
+    "candidate_trajectory_count",
+    "checkpoint_probe_enabled",
+    "checkpoint_step",
+    "clean_topk_available",
+    "clean_topk_k",
+    "clean_topk_probs",
+    "clean_topk_source",
+    "clean_topk_token_ids",
+    "clean_topk_unavailable_reason",
+    "component_log_prob",
+    "component_log_probs",
+    "configured_total_steps",
+    "count",
+    "credit/alignment_count",
+    "credit/concentration_count",
+    "credit/effective_k",
+    "credit/spearman_count",
+    "credit/surrogate_alignment_rate",
+    "credit/surrogate_alignment_rate__available",
+    "credit/surrogate_alignment_rate__unavailable_reason",
+    "credit/top1_share",
+    "credit/weight_credit_spearman",
+    "credit/weight_credit_spearman__available",
+    "credit/weight_credit_spearman__unavailable_reason",
+    "credit_alignment_available",
+    "credit_alignment_probe_enabled",
+    "credit_alignment_unavailable_reason",
+    "credit_concentration_available",
+    "credit_concentration_unavailable_reason",
+    "credit_definition_version",
+    "credit_probe_enabled",
+    "credit_spearman_available",
+    "credit_spearman_unavailable_reason",
+    "cumulative_gpu_hours",
+    "cumulative_rollout_tokens",
+    "cumulative_train_samples",
+    "data_classification",
+    "dataset_name",
+    "dependency_check_status",
+    "diagnostic_batch_index",
+    "diagnostic_run_id",
+    "dtype",
+    "effective_position_count",
+    "eligible_latent_mask",
+    "eligible_latent_token_count",
+    "entropy_coeff",
+    "entropy_definition_version",
+    "entropy_mask_definition",
+    "entropy_probability_space",
+    "entropy_source",
+    "eval_dataset_name",
+    "eval_dataset_version",
+    "eval_generations_per_question",
+    "evaluation_rule_version",
+    "execution_scope",
+    "execution_surface",
+    "fail_training_on_logging_error",
+    "flipgrad_trigger_count",
+    "flipgrad_trigger_mask",
+    "flush_interval_records",
+    "gae_lambda",
+    "gamma",
+    "generated_token_count_definition_version",
+    "generated_token_count_scope",
+    "generation_failure_reason",
+    "generation_id",
+    "generation_seed",
+    "global_step",
+    "gradient_accumulation_steps",
+    "gradient_checkpointing",
+    "group/correct_trajectory_count",
+    "group/non_correct_trajectory_count",
+    "group/overlong_generated_token_count",
+    "group/overlong_response_length_max",
+    "group/overlong_trajectory_count",
+    "group/trajectory_count",
+    "group/zero_variance_reward",
+    "group_available",
+    "group_definition_version",
+    "group_id",
+    "group_unavailable_reason",
+    "gumbel/lower_clip_rate",
+    "gumbel/one_sided_count",
+    "gumbel/raw_count",
+    "gumbel/raw_mean",
+    "gumbel/raw_std",
+    "gumbel/upper_clip_rate",
+    "gumbel/zero_rate",
+    "gumbel_available",
+    "gumbel_clip_lower",
+    "gumbel_clip_upper",
+    "gumbel_compute_time_seconds",
+    "gumbel_diagnostics_enabled",
+    "gumbel_diagnostics_mode",
+    "gumbel_noise_scale",
+    "gumbel_temperature",
+    "gumbel_unavailable_reason",
+    "intersection_fraction_sum",
+    "is_correct",
+    "is_overlong_or_truncated_by_length",
+    "is_resume_run",
+    "is_valid_response",
+    "kl_coeff",
+    "latent_length",
+    "latent_length_definition_version",
+    "latent_position",
+    "latent_position_group",
+    "latent_position_rule_version",
+    "learning_rate",
+    "length_counting_rule_version",
+    "lower_clip_count",
+    "lr_scheduler_name",
+    "mask/eligible_latent_token_count",
+    "mask/zero_advantage_rate",
+    "mask_available",
+    "mask_unavailable_reason",
+    "masked_count",
+    "max",
+    "max_grad_norm",
+    "max_latent_length",
+    "max_prompt_length",
+    "max_response_length",
+    "metric_scope",
+    "metrics_compute_time",
+    "metrics_enabled",
+    "metrics_log_interval_steps",
+    "metrics_schema_version",
+    "metrics_write_time",
+    "min",
+    "mixture/effective_k_noisy",
+    "mixture/noisy_count",
+    "mixture/top1_weight_noisy",
+    "mixture_available",
+    "mixture_unavailable_reason",
+    "model_name_or_path",
+    "nan_count",
+    "near_zero_count",
+    "near_zero_mask",
+    "negative_count",
+    "negative_mask",
+    "network_access_performed",
+    "noisy_mixture_weights",
+    "num_gpus",
+    "numerator_count",
+    "observation_phase",
+    "one_sided_count",
+    "one_sided_gumbel_noise_offset",
+    "one_sided_zero_count",
+    "onesided/delta_count",
+    "onesided/delta_mean",
+    "onesided/delta_min",
+    "onesided/delta_near_zero_rate",
+    "onesided/delta_negative_rate",
+    "onesided/delta_p05",
+    "onesided/delta_std",
+    "onesided/flipgrad_count",
+    "onesided/flipgrad_rate",
+    "onesided_available",
+    "onesided_probe_enabled",
+    "onesided_unavailable_reason",
+    "optimal_correct_mean_old_log_prob",
+    "optimal_correct_trajectory_id",
+    "optimizer_name",
+    "optimizer_step",
+    "optimizer_step_at_observation",
+    "output_format",
+    "overlong_definition_version",
+    "overlong_sample_policy",
+    "platform_config_hash",
+    "platform_config_path",
+    "platform_detection_mode",
+    "platform_detection_status",
+    "platform_detector_version",
+    "platform_security_check_status",
+    "ppo_clip_ratio",
+    "ppo_epochs",
+    "ppo_micro_batch_size_per_gpu",
+    "ppo_mini_batch_size",
+    "pre_update_topk_source",
+    "pre_update_topk_token_ids",
+    "predicted_answer",
+    "privileged_operations_performed",
+    "probe_advantage_function_source",
+    "probe_batch_id",
+    "probe_batch_size",
+    "probe_benchmark_available",
+    "probe_benchmark_unavailable_reason",
+    "probe_definition_version",
+    "probe_effective_latent_position_count",
+    "probe_effective_prompt_count",
+    "probe_effective_trajectory_count",
+    "probe_extra_time_seconds",
+    "probe_first_token_selection_source",
+    "probe_generation_seed",
+    "probe_group_construction_source",
+    "probe_gumbel_seed",
+    "probe_max_latent_positions",
+    "probe_max_trajectories",
+    "probe_old_log_prob_timepoint",
+    "probe_peak_memory_bytes",
+    "probe_performs_optimizer_step",
+    "probe_prompt_ids",
+    "probe_response_mask_source",
+    "probe_restore_training_rng",
+    "probe_reward_manager_source",
+    "probe_reward_scorer_source",
+    "probe_rng_restore_succeeded",
+    "probe_sampling_parameters",
+    "probe_trajectories_per_prompt",
+    "probe_use_independent_rng",
+    "profile_name",
+    "prompt_hash",
+    "prompt_id_or_hash",
+    "python_environment_kind",
+    "python_executable_fingerprint",
+    "q_i",
+    "question_id",
+    "raw_count",
+    "raw_sum",
+    "raw_sum_sq",
+    "record_available",
+    "record_unavailable_reason",
+    "record_version",
+    "reference_answer",
+    "reference_answer_hash",
+    "remove_padding",
+    "resolved_launch_command_redacted",
+    "response_length",
+    "response_length_definition_version",
+    "resume_from_step",
+    "reward",
+    "reward_or_score",
+    "rollout_batch_size",
+    "rollout_micro_batch_size_per_gpu",
+    "rollout_n",
+    "rollout_noisy_topk_token_ids",
+    "rollout_perturbed_topk_scores",
+    "rollout_topk_source",
+    "runtime_environment_fingerprint",
+    "runtime_environment_fingerprint_available",
+    "runtime_environment_fingerprint_unavailable_reason",
+    "runtime_provenance_verified",
+    "runtime_tensor_probe_status",
+    "safe_to_share",
+    "sampling_temperature",
+    "save_jsonl_debug_copy",
+    "secret_redaction_applied",
+    "seed",
+    "selected_non_correct_mean_old_log_prob",
+    "selected_non_correct_trajectory_id",
+    "sequence_parallel_size",
+    "signal/advantage_count",
+    "signal/advantage_std",
+    "signal/reward_count",
+    "signal/reward_mean",
+    "signal/reward_std",
+    "signal_available",
+    "signal_unavailable_reason",
+    "sum",
+    "sum_sq",
+    "support/effective_position_count",
+    "support/retention_rate",
+    "support/top1_retention_rate",
+    "support_available",
+    "support_benchmark/total_effective_position_count",
+    "support_cache_peak_bytes",
+    "support_candidate_trajectory_count",
+    "support_current_policy_timepoint",
+    "support_definition_version",
+    "support_exclude_overlong",
+    "support_extra_time_seconds",
+    "support_include_correct",
+    "support_include_non_correct",
+    "support_interval_steps",
+    "support_observation_phase",
+    "support_requires_remove_padding",
+    "support_selected_trajectory_count",
+    "support_start_step",
+    "support_unavailable_reason",
+    "surrogate_alignment_definition_version",
+    "surrogate_margin",
+    "tensor_parallel_size",
+    "test_steps",
+    "top1_retained_count",
+    "top_k",
+    "top_p",
+    "train/clip_fraction",
+    "train/entropy",
+    "train/generated_token_count",
+    "train/importance_ratio_mean",
+    "train/importance_ratio_std",
+    "train/kl",
+    "train/latent_length",
+    "train/policy_loss",
+    "train/response_length",
+    "train/step_time",
+    "train_batch_size",
+    "train_core_available",
+    "train_core_unavailable_reason",
+    "trajectory_class",
+    "trajectory_classification_version",
+    "trajectory_group",
+    "trajectory_id",
+    "trajectory_mean_old_log_prob",
+    "trajectory_score_formula",
+    "trajectory_score_name",
+    "trajectory_selection_rule_version",
+    "u_i",
+    "upper_clip_count",
+    "use_first_token_selection",
+    "use_flipgrad",
+    "use_one_sided_noise",
+    "valid_latent_component_mask",
+    "valid_latent_position_mask",
+    "wall_clock_seconds",
+    "warmup_steps",
+    "weight_decay",
+    "workspace_external_scan_performed",
+    "workspace_fingerprint",
+    "world_size",
+    "zero_advantage_count",
+    "zero_advantage_mask"
+  ],
+  "schema_declared_fields": 237,
+  "schema_version": "metrics_schema_v1",
+  "source_counts": {
+    "rtm_table_qualified_records": 420,
+    "target_variables_canonical_unique_fields": 325,
+    "target_variables_core_metrics": 29
+  },
+  "spec_extracted_fields": [
+    "advantage",
+    "aggregation_worker_count",
+    "automatic_installation_performed",
+    "base_learning_rate",
+    "candidate_trajectory_count",
+    "checkpoint_probe_enabled",
+    "checkpoint_step",
+    "clean_topk_available",
+    "clean_topk_k",
+    "clean_topk_probs",
+    "clean_topk_source",
+    "clean_topk_token_ids",
+    "clean_topk_unavailable_reason",
+    "component_log_prob",
+    "component_log_probs",
+    "configured_total_steps",
+    "count",
+    "credit/alignment_count",
+    "credit/concentration_count",
+    "credit/effective_k",
+    "credit/spearman_count",
+    "credit/surrogate_alignment_rate",
+    "credit/surrogate_alignment_rate__available",
+    "credit/surrogate_alignment_rate__unavailable_reason",
+    "credit/top1_share",
+    "credit/weight_credit_spearman",
+    "credit/weight_credit_spearman__available",
+    "credit/weight_credit_spearman__unavailable_reason",
+    "credit_alignment_available",
+    "credit_alignment_probe_enabled",
+    "credit_alignment_unavailable_reason",
+    "credit_concentration_available",
+    "credit_concentration_unavailable_reason",
+    "credit_definition_version",
+    "credit_probe_enabled",
+    "credit_spearman_available",
+    "credit_spearman_unavailable_reason",
+    "cumulative_gpu_hours",
+    "cumulative_rollout_tokens",
+    "cumulative_train_samples",
+    "data_classification",
+    "dataset_name",
+    "dependency_check_status",
+    "diagnostic_batch_index",
+    "diagnostic_run_id",
+    "dtype",
+    "effective_position_count",
+    "eligible_latent_mask",
+    "eligible_latent_token_count",
+    "entropy_coeff",
+    "entropy_definition_version",
+    "entropy_mask_definition",
+    "entropy_probability_space",
+    "entropy_source",
+    "eval_dataset_name",
+    "eval_dataset_version",
+    "eval_generations_per_question",
+    "evaluation_rule_version",
+    "execution_scope",
+    "execution_surface",
+    "fail_training_on_logging_error",
+    "flipgrad_trigger_count",
+    "flipgrad_trigger_mask",
+    "flush_interval_records",
+    "gae_lambda",
+    "gamma",
+    "generated_token_count_definition_version",
+    "generated_token_count_scope",
+    "generation_failure_reason",
+    "generation_id",
+    "generation_seed",
+    "global_step",
+    "gradient_accumulation_steps",
+    "gradient_checkpointing",
+    "group/correct_trajectory_count",
+    "group/non_correct_trajectory_count",
+    "group/overlong_generated_token_count",
+    "group/overlong_response_length_max",
+    "group/overlong_trajectory_count",
+    "group/trajectory_count",
+    "group/zero_variance_reward",
+    "group_available",
+    "group_definition_version",
+    "group_id",
+    "group_unavailable_reason",
+    "gumbel/lower_clip_rate",
+    "gumbel/one_sided_count",
+    "gumbel/raw_count",
+    "gumbel/raw_mean",
+    "gumbel/raw_std",
+    "gumbel/upper_clip_rate",
+    "gumbel/zero_rate",
+    "gumbel_available",
+    "gumbel_clip_lower",
+    "gumbel_clip_upper",
+    "gumbel_compute_time_seconds",
+    "gumbel_diagnostics_enabled",
+    "gumbel_diagnostics_mode",
+    "gumbel_noise_scale",
+    "gumbel_temperature",
+    "gumbel_unavailable_reason",
+    "intersection_fraction_sum",
+    "is_correct",
+    "is_overlong_or_truncated_by_length",
+    "is_resume_run",
+    "is_valid_response",
+    "kl_coeff",
+    "latent_length",
+    "latent_length_definition_version",
+    "latent_position",
+    "latent_position_group",
+    "latent_position_rule_version",
+    "learning_rate",
+    "length_counting_rule_version",
+    "lower_clip_count",
+    "lr_scheduler_name",
+    "mask/eligible_latent_token_count",
+    "mask/zero_advantage_rate",
+    "mask_available",
+    "mask_unavailable_reason",
+    "masked_count",
+    "max",
+    "max_grad_norm",
+    "max_latent_length",
+    "max_prompt_length",
+    "max_response_length",
+    "metric_scope",
+    "metrics_compute_time",
+    "metrics_enabled",
+    "metrics_log_interval_steps",
+    "metrics_schema_version",
+    "metrics_write_time",
+    "min",
+    "mixture/effective_k_noisy",
+    "mixture/noisy_count",
+    "mixture/top1_weight_noisy",
+    "mixture_available",
+    "mixture_unavailable_reason",
+    "model_name_or_path",
+    "nan_count",
+    "near_zero_count",
+    "near_zero_mask",
+    "negative_count",
+    "negative_mask",
+    "network_access_performed",
+    "noisy_mixture_weights",
+    "num_gpus",
+    "observation_phase",
+    "one_sided_count",
+    "one_sided_gumbel_noise_offset",
+    "one_sided_zero_count",
+    "onesided/delta_count",
+    "onesided/delta_mean",
+    "onesided/delta_min",
+    "onesided/delta_near_zero_rate",
+    "onesided/delta_negative_rate",
+    "onesided/delta_p05",
+    "onesided/delta_std",
+    "onesided/flipgrad_count",
+    "onesided/flipgrad_rate",
+    "onesided_available",
+    "onesided_probe_enabled",
+    "onesided_unavailable_reason",
+    "optimal_correct_mean_old_log_prob",
+    "optimal_correct_trajectory_id",
+    "optimizer_name",
+    "optimizer_step",
+    "optimizer_step_at_observation",
+    "output_format",
+    "overlong_definition_version",
+    "overlong_sample_policy",
+    "platform_config_hash",
+    "platform_config_path",
+    "platform_detection_mode",
+    "platform_detection_status",
+    "platform_detector_version",
+    "platform_security_check_status",
+    "ppo_clip_ratio",
+    "ppo_epochs",
+    "ppo_micro_batch_size_per_gpu",
+    "ppo_mini_batch_size",
+    "pre_update_topk_source",
+    "pre_update_topk_token_ids",
+    "predicted_answer",
+    "privileged_operations_performed",
+    "probe_advantage_function_source",
+    "probe_batch_id",
+    "probe_batch_size",
+    "probe_benchmark_available",
+    "probe_benchmark_unavailable_reason",
+    "probe_definition_version",
+    "probe_effective_latent_position_count",
+    "probe_effective_prompt_count",
+    "probe_effective_trajectory_count",
+    "probe_extra_time_seconds",
+    "probe_first_token_selection_source",
+    "probe_generation_seed",
+    "probe_group_construction_source",
+    "probe_gumbel_seed",
+    "probe_max_latent_positions",
+    "probe_max_trajectories",
+    "probe_old_log_prob_timepoint",
+    "probe_peak_memory_bytes",
+    "probe_performs_optimizer_step",
+    "probe_prompt_ids",
+    "probe_response_mask_source",
+    "probe_restore_training_rng",
+    "probe_reward_manager_source",
+    "probe_reward_scorer_source",
+    "probe_rng_restore_succeeded",
+    "probe_sampling_parameters",
+    "probe_trajectories_per_prompt",
+    "probe_use_independent_rng",
+    "profile_name",
+    "prompt_hash",
+    "prompt_id_or_hash",
+    "python_environment_kind",
+    "python_executable_fingerprint",
+    "q_i",
+    "question_id",
+    "raw_count",
+    "raw_sum",
+    "raw_sum_sq",
+    "record_available",
+    "record_unavailable_reason",
+    "record_version",
+    "reference_answer",
+    "reference_answer_hash",
+    "remove_padding",
+    "resolved_launch_command_redacted",
+    "response_length",
+    "response_length_definition_version",
+    "resume_from_step",
+    "reward",
+    "reward_or_score",
+    "rollout_batch_size",
+    "rollout_micro_batch_size_per_gpu",
+    "rollout_n",
+    "rollout_noisy_topk_token_ids",
+    "rollout_perturbed_topk_scores",
+    "rollout_topk_source",
+    "runtime_environment_fingerprint",
+    "runtime_environment_fingerprint_available",
+    "runtime_environment_fingerprint_unavailable_reason",
+    "runtime_provenance_verified",
+    "runtime_tensor_probe_status",
+    "safe_to_share",
+    "sampling_temperature",
+    "save_jsonl_debug_copy",
+    "secret_redaction_applied",
+    "seed",
+    "selected_non_correct_mean_old_log_prob",
+    "selected_non_correct_trajectory_id",
+    "sequence_parallel_size",
+    "signal/advantage_count",
+    "signal/advantage_std",
+    "signal/reward_count",
+    "signal/reward_mean",
+    "signal/reward_std",
+    "signal_available",
+    "signal_unavailable_reason",
+    "sum",
+    "sum_sq",
+    "support/effective_position_count",
+    "support/retention_rate",
+    "support/top1_retention_rate",
+    "support_available",
+    "support_benchmark/total_effective_position_count",
+    "support_cache_peak_bytes",
+    "support_candidate_trajectory_count",
+    "support_current_policy_timepoint",
+    "support_definition_version",
+    "support_exclude_overlong",
+    "support_extra_time_seconds",
+    "support_include_correct",
+    "support_include_non_correct",
+    "support_interval_steps",
+    "support_observation_phase",
+    "support_requires_remove_padding",
+    "support_selected_trajectory_count",
+    "support_start_step",
+    "support_unavailable_reason",
+    "surrogate_alignment_definition_version",
+    "surrogate_margin",
+    "tensor_parallel_size",
+    "test_steps",
+    "top1_retained_count",
+    "top_k",
+    "top_p",
+    "train/clip_fraction",
+    "train/entropy",
+    "train/generated_token_count",
+    "train/importance_ratio_mean",
+    "train/importance_ratio_std",
+    "train/kl",
+    "train/latent_length",
+    "train/policy_loss",
+    "train/response_length",
+    "train/step_time",
+    "train_batch_size",
+    "train_core_available",
+    "train_core_unavailable_reason",
+    "trajectory_class",
+    "trajectory_classification_version",
+    "trajectory_group",
+    "trajectory_id",
+    "trajectory_mean_old_log_prob",
+    "trajectory_score_formula",
+    "trajectory_score_name",
+    "trajectory_selection_rule_version",
+    "u_i",
+    "upper_clip_count",
+    "use_first_token_selection",
+    "use_flipgrad",
+    "use_one_sided_noise",
+    "valid_latent_component_mask",
+    "valid_latent_position_mask",
+    "wall_clock_seconds",
+    "warmup_steps",
+    "weight_decay",
+    "workspace_external_scan_performed",
+    "workspace_fingerprint",
+    "world_size",
+    "zero_advantage_count",
+    "zero_advantage_mask"
+  ],
+  "target_machine_test_deferred_fields": 397,
+  "total_target_fields": 420,
+  "unavailable_with_reason_fields": 0,
+  "unique_target_fields": 330,
+  "verified_fields": 0
+}
+

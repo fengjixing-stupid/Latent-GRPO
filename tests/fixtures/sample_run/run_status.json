@@ -1,0 +1,9 @@
+{
+  "last_committed_global_step": null,
+  "last_committed_optimizer_step": null,
+  "last_checkpoint_step": null,
+  "last_error_message": null,
+  "last_error_type": null,
+  "status": "completed",
+  "updated_at": "2026-08-02T00:00:00Z"
+}

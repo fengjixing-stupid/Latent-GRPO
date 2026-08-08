@@ -1,0 +1,12 @@
+{
+  "command": ["bash", "scripts/target_machine/10_resume_smoke.sh"],
+  "started_at": null,
+  "finished_at": null,
+  "exit_code": null,
+  "status": "target_machine_test_deferred",
+  "environment_summary": {"max_steps": 2, "requires_resume_checkpoint": true},
+  "stdout_log_path": "artifacts/target_machine/logs/10_resume_smoke.stdout.log",
+  "stderr_log_path": "artifacts/target_machine/logs/10_resume_smoke.stderr.log",
+  "artifacts": ["artifacts/target_machine/runs/resume_gpu"],
+  "failure_reason": "not_executed_on_target_machine"
+}

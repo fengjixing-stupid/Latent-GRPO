@@ -1,0 +1,6 @@
+{
+  "metrics_schema_version": "metrics_schema_v1",
+  "profile_name": "smoke",
+  "seed": 1,
+  "status": "synthetic_test_passed"
+}

@@ -1,0 +1,2 @@
+# Runner storage and Parquet contract.
+pyarrow>=19.0.0

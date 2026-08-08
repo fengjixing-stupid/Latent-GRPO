@@ -1,0 +1,12 @@
+{
+  "command": ["bash", "scripts/target_machine/07_validate_single_gpu_output.sh"],
+  "started_at": null,
+  "finished_at": null,
+  "exit_code": null,
+  "status": "target_machine_test_deferred",
+  "environment_summary": {},
+  "stdout_log_path": "artifacts/target_machine/logs/07_validate_single_gpu_output.stdout.log",
+  "stderr_log_path": "artifacts/target_machine/logs/07_validate_single_gpu_output.stderr.log",
+  "artifacts": ["artifacts/target_machine/runs/single_gpu"],
+  "failure_reason": "not_executed_on_target_machine"
+}

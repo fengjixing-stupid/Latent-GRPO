@@ -1,0 +1,14 @@
+{
+  "metrics_schema_version": "metrics_schema_v1",
+  "tables": {
+    "eval_clean_topk": {"deferred_reason": "target_machine_storage_not_executed", "primary_key": ["profile_name", "seed", "checkpoint_step", "question_id", "generation_id", "latent_position"], "status": "target_machine_test_deferred"},
+    "eval_question_results": {"deferred_reason": "target_machine_storage_not_executed", "primary_key": ["profile_name", "seed", "checkpoint_step", "question_id", "generation_id"], "status": "target_machine_test_deferred"},
+    "gumbel_diagnostics": {"deferred_reason": "diagnostic_not_run", "primary_key": ["profile_name", "seed", "diagnostic_run_id", "diagnostic_batch_index"], "status": "target_machine_test_deferred"},
+    "probe_benchmark_metrics": {"deferred_reason": "checkpoint_probe_not_run", "primary_key": ["profile_name", "seed", "checkpoint_step", "probe_batch_id"], "status": "target_machine_test_deferred"},
+    "probe_metrics": {"deferred_reason": "checkpoint_probe_not_run", "primary_key": ["profile_name", "seed", "checkpoint_step", "probe_batch_id", "trajectory_group", "latent_position_group"], "status": "target_machine_test_deferred"},
+    "support_benchmark_metrics": {"deferred_reason": "support_not_run", "primary_key": ["profile_name", "seed", "global_step"], "status": "target_machine_test_deferred"},
+    "support_metrics": {"deferred_reason": "support_not_run", "primary_key": ["profile_name", "seed", "global_step", "group_id", "trajectory_id", "trajectory_class"], "status": "target_machine_test_deferred"},
+    "train_group_metrics": {"deferred_reason": "synthetic_fixture_has_no_training_rows", "primary_key": ["profile_name", "seed", "global_step", "group_id"], "status": "target_machine_test_deferred"},
+    "train_step_metrics": {"deferred_reason": "synthetic_fixture_has_no_training_rows", "primary_key": ["profile_name", "seed", "global_step"], "status": "target_machine_test_deferred"}
+  }
+}

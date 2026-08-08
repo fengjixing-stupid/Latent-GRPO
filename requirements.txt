@@ -1,0 +1,6 @@
+# Runtime dependency groups only.  PyTorch CUDA wheels and system CUDA/NCCL
+# are installed separately by the target-machine runbook.
+-r requirements/runtime-core.txt
+-r requirements/runtime-sglang.txt
+-r requirements/metrics.txt
+-r requirements/reward-math.txt

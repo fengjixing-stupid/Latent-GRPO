@@ -1,0 +1,23 @@
+# Direct Python dependencies evidenced by Latent-GRPO/verl-0.4.x/setup.py
+# and imports in the audited training path.  Unpinned entries intentionally
+# remain resolver candidates until the Linux target-machine lock is verified.
+accelerate
+codetiming
+datasets
+dill
+hydra-core
+numpy<2.0.0
+pandas
+peft
+pybind11
+PyYAML
+ray[default]>=2.41.0
+safetensors
+tensordict<=0.6.2
+torchdata
+transformers==4.51.1
+packaging>=20.0
+
+# The CUDA PyTorch wheel is deliberately absent. Install torch==2.6.0 and
+# torchvision==0.21.0 from the selected official CUDA index before this file.
+# Install the vendored verl fork separately with --no-deps after dependencies.
