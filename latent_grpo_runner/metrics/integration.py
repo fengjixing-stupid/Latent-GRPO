@@ -20,6 +20,8 @@ from latent_grpo_runner.checkpointing import (
     resume_metric_writers_from_sidecar,
     write_checkpoint_sidecar,
 )
+from latent_grpo_runner.metrics.events import StepContext
+from latent_grpo_runner.metrics.p1 import P1AggregationError, build_p1_train_step_metrics
 from latent_grpo_runner.metrics.schemas import schema_manifest
 from latent_grpo_runner.metrics.storage import AppendOnlyPartWriter, PartBackend
 
@@ -150,7 +152,7 @@ class DurableMetricsObserver:
             raise ObserverIntegrationError("observer facts must be a mapping")
 
         if event_type == "actor_update":
-            self._commit_p0_train_step(facts)
+            self._commit_train_step(facts)
             return
 
         # These existing hooks are intentionally accepted at P0 so enabling the
@@ -222,7 +224,7 @@ class DurableMetricsObserver:
                 writer.close()
             raise
 
-    def _commit_p0_train_step(self, facts: Mapping[str, object]) -> None:
+    def _commit_train_step(self, facts: Mapping[str, object]) -> None:
         global_step = facts.get("global_step")
         update_count = facts.get("update_count")
         aggregation_worker_count = facts.get("aggregation_worker_count")
@@ -238,11 +240,66 @@ class DurableMetricsObserver:
             raise ObserverIntegrationError("actor_update requires positive aggregation_worker_count")
 
         next_optimizer_step = self._optimizer_step + update_count
-        row = self._p0_unavailable_train_step_row(
-            global_step=global_step,
-            optimizer_step=next_optimizer_step,
-            aggregation_worker_count=aggregation_worker_count,
+        p1_declared = (
+            "p1_worker_metrics_available" in facts
+            or "p1_driver_metrics_available" in facts
         )
+        if p1_declared:
+            if facts.get("p1_worker_metrics_available") is not True:
+                raise ObserverIntegrationError(
+                    "P1 worker statistics unavailable: "
+                    + str(facts.get("p1_worker_metrics_unavailable_reason") or "unknown")
+                )
+            if facts.get("p1_driver_metrics_available") is not True:
+                raise ObserverIntegrationError("P1 driver statistics unavailable")
+            worker_statistics = facts.get("p1_worker_sufficient_stats")
+            driver_statistics = facts.get("p1_driver_sufficient_stats")
+            trajectory_lengths = facts.get("final_training_trajectory_lengths")
+            step_time = facts.get("driver_step_time_seconds")
+            if not isinstance(worker_statistics, Mapping) or not isinstance(driver_statistics, Mapping):
+                raise ObserverIntegrationError("P1 sufficient statistics must be mappings")
+            if not isinstance(trajectory_lengths, (list, tuple)):
+                raise ObserverIntegrationError("P1 final trajectory lengths must be a sequence")
+            if type(step_time) not in {int, float}:
+                raise ObserverIntegrationError("P1 driver step time must be numeric")
+            learning_rate = facts.get("learning_rate")
+            metrics_compute_time = facts.get("metrics_compute_time")
+            context = StepContext(
+                profile_name=self.profile_name,
+                seed=self.seed,
+                global_step=global_step,
+                optimizer_step=next_optimizer_step,
+                observation_phase="post_update",
+                learning_rate=(
+                    float(learning_rate) if type(learning_rate) in {int, float} else None
+                ),
+                is_resume_run=self._is_resume_run,
+                resume_from_step=self._resume_from_step,
+            )
+            try:
+                row = build_p1_train_step_metrics(
+                    context=context,
+                    worker_statistics=worker_statistics,
+                    driver_statistics=driver_statistics,
+                    final_training_trajectory_lengths=trajectory_lengths,
+                    driver_step_time_seconds=float(step_time),
+                    aggregation_worker_count=aggregation_worker_count,
+                    metrics_compute_time=(
+                        float(metrics_compute_time)
+                        if type(metrics_compute_time) in {int, float}
+                        else None
+                    ),
+                )
+            except (P1AggregationError, ValueError, TypeError) as error:
+                raise ObserverIntegrationError("invalid P1 train-step payload") from error
+        else:
+            # Backward-compatible P0 synthetic fixtures remain explicitly
+            # unavailable. The production P1 trainer always declares P1 fields.
+            row = self._p0_unavailable_train_step_row(
+                global_step=global_step,
+                optimizer_step=next_optimizer_step,
+                aggregation_worker_count=aggregation_worker_count,
+            )
         self._writers["train_step_metrics"].append([row])
         self._optimizer_step = next_optimizer_step
 

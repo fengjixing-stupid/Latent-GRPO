@@ -20,6 +20,7 @@ This trainer supports model-agonistic model initialization with huggingface
 
 import json
 import os
+import time
 import uuid
 from collections import defaultdict
 from contextlib import contextmanager
@@ -62,6 +63,8 @@ from verl.utils.tracking import ValidationGenerationsLogger
 from verl.workers.rollout.async_server import AsyncLLMServerManager
 
 try:
+    from latent_grpo_runner.metrics.p1 import merge_worker_p1_packets
+    from latent_grpo_runner.metrics.torch_collectors import collect_driver_p1_statistics
     from latent_grpo_runner.upstream_adapter import (
         attach_stable_ids_to_batch,
         emit_eval_question_facts,
@@ -70,9 +73,11 @@ try:
     )
 except ImportError:  # The author repository must remain runnable without the external runner.
     attach_stable_ids_to_batch = None
+    collect_driver_p1_statistics = None
     emit_eval_question_facts = None
     load_observer_from_env = None
     merge_worker_observer_packets = None
+    merge_worker_p1_packets = None
 
 WorkerType = Type[Worker]
 
@@ -1123,6 +1128,13 @@ class RayPPOTrainer:
                 )
 
                 is_last_step = self.global_steps >= self.total_training_steps
+                observer_enabled = bool(
+                    self._latent_grpo_observer is not None
+                    and self._latent_grpo_observer.enabled
+                )
+                step_started_at = time.perf_counter() if observer_enabled else None
+                p1_driver_payload = None
+                p1_driver_compute_time = 0.0
 
                 with _timer("step", timing_raw):
                     # generate a batch
@@ -1399,7 +1411,17 @@ class RayPPOTrainer:
                         )
                         scores_std = [item for _,item in id2stds.items()]
                         metrics.update({"rollout/rewards_std": sum(scores_std)/len(scores_std)})
-    
+
+                    if observer_enabled:
+                        if collect_driver_p1_statistics is None:
+                            raise RuntimeError("driver P1 collector is unavailable")
+                        p1_compute_started = time.perf_counter()
+                        p1_driver_payload = collect_driver_p1_statistics(
+                            batch,
+                            entropies=entropys,
+                            exclude_overlong_samples_from_advantage=exclude_overlong_samples_from_advantage,
+                        )
+                        p1_driver_compute_time += time.perf_counter() - p1_compute_started
 
                     # update critic
                     if self.use_critic:
@@ -1420,30 +1442,52 @@ class RayPPOTrainer:
                         worker_observer_packets = actor_output.meta_info.pop(
                             "latent_grpo_worker_observers", []
                         )
-                        observer_enabled = bool(
-                            self._latent_grpo_observer is not None
-                            and self._latent_grpo_observer.enabled
-                        )
                         if worker_observer_packets and not observer_enabled:
                             raise RuntimeError(
                                 "worker observer packets require an enabled durable coordinator sink"
                             )
+                        actor_update_event = None
                         if observer_enabled:
-                            if merge_worker_observer_packets is None:
+                            if merge_worker_observer_packets is None or merge_worker_p1_packets is None:
                                 raise RuntimeError("worker observer packet merger is unavailable")
+                            if p1_driver_payload is None:
+                                raise RuntimeError("driver P1 payload was not collected before actor update")
                             actor_update_event = merge_worker_observer_packets(
                                 worker_observer_packets,
                                 expected_worker_count=self.actor_rollout_wg.world_size,
                             )
+                            p1_worker_event = merge_worker_p1_packets(
+                                worker_observer_packets,
+                                expected_worker_count=self.actor_rollout_wg.world_size,
+                            )
+                            if p1_worker_event.get("p1_worker_metrics_available") is not True:
+                                raise RuntimeError(
+                                    "worker P1 sufficient statistics unavailable: "
+                                    + str(p1_worker_event.get("p1_worker_metrics_unavailable_reason"))
+                                )
+                            actor_update_event.update(p1_worker_event)
+                            actor_update_event.update(p1_driver_payload)
                             actor_update_event.update(
                                 {
                                     "global_step": int(self.global_steps),
                                     "observation_phase": "post_update",
                                 }
                             )
-                            self._latent_grpo_observer.emit("actor_update", actor_update_event)
                         actor_output_metrics = reduce_metrics(actor_output.meta_info["metrics"])
                         metrics.update(actor_output_metrics)
+                        if observer_enabled:
+                            assert actor_update_event is not None and step_started_at is not None
+                            actor_update_event.update(
+                                {
+                                    "driver_step_time_seconds": max(
+                                        0.0,
+                                        time.perf_counter() - step_started_at - p1_driver_compute_time,
+                                    ),
+                                    "metrics_compute_time": p1_driver_compute_time,
+                                    "learning_rate": metrics.get("actor/lr"),
+                                }
+                            )
+                            self._latent_grpo_observer.emit("actor_update", actor_update_event)
 
                     # Log rollout generations if enabled
                     rollout_data_dir = self.config.trainer.get("rollout_data_dir", None)

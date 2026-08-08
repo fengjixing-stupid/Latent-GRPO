@@ -82,7 +82,11 @@ class DataParallelPPOActor(BasePPOActor):
         # does not change the actor's public return values.
         observer_setting = str(os.getenv("LATENT_GRPO_OBSERVER_ENABLED", "0")).strip().lower()
         self._latent_grpo_observer_enabled = observer_setting in {"1", "true", "yes", "on"}
-        self._latent_grpo_observer_facts = {"optimizer_steps": [], "component_sufficient_stats": []}
+        self._latent_grpo_observer_facts = {
+            "optimizer_steps": [],
+            "component_sufficient_stats": [],
+            "p1_sufficient_stats": {},
+        }
         self._last_optimizer_did_step = False
         self.last_update_did_step = False
         self.last_update_count = 0
@@ -134,10 +138,32 @@ class DataParallelPPOActor(BasePPOActor):
                 {"available": False, "unavailable_reason": str(reason)}
             )
 
-    def consume_latent_grpo_observer_facts(self):
-        """Return a bounded plain-dict payload and clear it after the worker handoff."""
+    def _record_p1_sufficient_stats(
+        self, name, values, mask, *, numerator_mask=None, definition_version
+    ):
+        """Reduce one already-computed PPO tensor immediately to scalar stats."""
         if not self._latent_grpo_observer_enabled:
-            return {}
+            return
+        try:
+            from latent_grpo_runner.metrics.p1 import merge_serialized_sufficient_stats
+            from latent_grpo_runner.metrics.torch_collectors import sufficient_stats_from_tensor
+        except ImportError as error:
+            raise RuntimeError("P1 observer collectors are unavailable on the actor worker") from error
+        local = sufficient_stats_from_tensor(
+            values,
+            mask=mask,
+            numerator_mask=numerator_mask,
+            definition_version=definition_version,
+        )
+        mapping = self._latent_grpo_observer_facts["p1_sufficient_stats"]
+        previous = mapping.get(name)
+        mapping[name] = (
+            local
+            if previous is None
+            else merge_serialized_sufficient_stats([previous, local])
+        )
+
+    def consume_latent_grpo_observer_facts(self):
         facts = {
             "did_step": bool(self.last_update_did_step),
             "did_update": bool(self.last_update_did_step),
@@ -146,8 +172,15 @@ class DataParallelPPOActor(BasePPOActor):
             "component_sufficient_stats": list(
                 self._latent_grpo_observer_facts["component_sufficient_stats"]
             ),
+            "p1_sufficient_stats": dict(
+                self._latent_grpo_observer_facts["p1_sufficient_stats"]
+            ),
         }
-        self._latent_grpo_observer_facts = {"optimizer_steps": [], "component_sufficient_stats": []}
+        self._latent_grpo_observer_facts = {
+            "optimizer_steps": [],
+            "component_sufficient_stats": [],
+            "p1_sufficient_stats": {},
+        }
         return facts
 
     def _forward_micro_batch(self, micro_batch, temperature, top_p,  calculate_entropy=False, add_noise_dirichlet=False,
@@ -713,7 +746,7 @@ class DataParallelPPOActor(BasePPOActor):
                                                                   component_response_mask=response_mask,)
                     
                     neg_adv_weight = self.config.get("neg_adv_weight", 1.0)
-                    pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower = compute_policy_loss(
+                    policy_result = compute_policy_loss(
                         old_log_prob=old_log_prob,
                         log_prob=log_prob,
                         advantages=advantages,
@@ -724,7 +757,29 @@ class DataParallelPPOActor(BasePPOActor):
                         clip_ratio_c=clip_ratio_c,
                         neg_adv_weight=neg_adv_weight,
                         loss_agg_mode=loss_agg_mode,
+                        return_observer_tensors=self._latent_grpo_observer_enabled,
                     )
+                    if self._latent_grpo_observer_enabled:
+                        pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower, p1_tensors = policy_result
+                        self._record_p1_sufficient_stats(
+                            "train/policy_loss", p1_tensors["policy_loss_elements"], response_mask,
+                            definition_version="ppo_policy_loss_elements_v1",
+                        )
+                        self._record_p1_sufficient_stats(
+                            "train/kl", p1_tensors["kl_elements"], response_mask,
+                            definition_version="ppo_negative_approx_kl_v1",
+                        )
+                        self._record_p1_sufficient_stats(
+                            "train/clip_fraction", p1_tensors["clip_mask"], response_mask,
+                            numerator_mask=p1_tensors["clip_mask"],
+                            definition_version="ppo_primary_clip_fraction_v1",
+                        )
+                        self._record_p1_sufficient_stats(
+                            "train/importance_ratio", p1_tensors["importance_ratio"], response_mask,
+                            definition_version="ppo_importance_ratio_v1",
+                        )
+                    else:
+                        pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower = policy_result
                     if entropy_coeff != 0:
                         entropy_loss = agg_loss(loss_mat=entropy, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)
 

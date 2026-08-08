@@ -786,6 +786,7 @@ def compute_policy_loss(
     clip_ratio_c=3.0,
     neg_adv_weight=1.0,  # [新增] 负优势权重系数
     loss_agg_mode: str = "token-mean",
+    return_observer_tensors: bool = False,
 ):
     """
     Compute the clipped policy objective and related metrics for PPO.
@@ -828,7 +829,8 @@ def compute_policy_loss(
         cliprange_high = cliprange
     pg_losses2 = -advantages * torch.clamp(ratio, 1 - cliprange_low, 1 + cliprange_high)  # - clip(ratio, 1-cliprange, 1+cliprange) * A
     clip_pg_losses1 = torch.maximum(pg_losses1, pg_losses2)  # max(-ratio * A, -clip(ratio, 1-cliprange, 1+cliprange) * A)
-    pg_clipfrac = verl_F.masked_mean(torch.gt(pg_losses2, pg_losses1).float(), response_mask)
+    clip_mask = torch.gt(pg_losses2, pg_losses1)
+    pg_clipfrac = verl_F.masked_mean(clip_mask.float(), response_mask)
 
     pg_losses3 = -advantages * clip_ratio_c
     clip_pg_losses2 = torch.min(pg_losses3, clip_pg_losses1)
@@ -837,6 +839,13 @@ def compute_policy_loss(
     pg_losses = torch.where(advantages < 0, clip_pg_losses2 * neg_adv_weight, clip_pg_losses1)
     pg_loss = agg_loss(loss_mat=pg_losses, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)
 
+    if return_observer_tensors:
+        return pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower, {
+            "policy_loss_elements": pg_losses,
+            "clip_mask": clip_mask,
+            "kl_elements": -negative_approx_kl,
+            "importance_ratio": ratio,
+        }
     return pg_loss, pg_clipfrac, ppo_kl, pg_clipfrac_lower
 
 
