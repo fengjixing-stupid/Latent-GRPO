@@ -640,7 +640,7 @@ def _expect_bool(values: Mapping[str, Any], key: str) -> bool:
 
 
 def validate_latent_end_token(model: ModelConfig, tokenizer: Any, model_config: Any) -> dict[str, Any]:
-    """Fail closed unless the configured latent-end ID and token agree at launch time."""
+    """Fail closed unless the configured ID is the marker's first tokenizer ID."""
     if tokenizer is None or model_config is None:
         raise ConfigError("latent-end validation requires both tokenizer and model config")
     tokenizer_vocab_size = getattr(tokenizer, "vocab_size", None)
@@ -652,14 +652,23 @@ def validate_latent_end_token(model: ModelConfig, tokenizer: Any, model_config: 
     if model.latent_end_token_id >= tokenizer_vocab_size or model.latent_end_token_id >= model_vocab_size:
         raise ConfigError("latent-end token ID is outside tokenizer/model vocabulary")
     try:
-        resolved_token = tokenizer.convert_ids_to_tokens(model.latent_end_token_id)
+        marker_ids = tokenizer.encode(model.latent_end_token, add_special_tokens=False)
     except Exception as error:
-        raise ConfigError("tokenizer could not resolve configured latent-end token ID") from error
-    if not isinstance(resolved_token, str) or resolved_token != model.latent_end_token:
-        raise ConfigError("configured latent-end token does not match tokenizer token string")
+        raise ConfigError("tokenizer could not encode configured latent-end marker") from error
+    if (
+        not isinstance(marker_ids, (list, tuple))
+        or not marker_ids
+        or any(type(token_id) is not int for token_id in marker_ids)
+    ):
+        raise ConfigError("configured latent-end marker did not produce valid tokenizer IDs")
+    if marker_ids[0] != model.latent_end_token_id:
+        raise ConfigError(
+            "configured latent-end token ID does not match the first tokenizer ID "
+            "of the latent-end marker"
+        )
     return {
         "latent_end_token_id": model.latent_end_token_id,
-        "latent_end_token": resolved_token,
+        "latent_end_token": model.latent_end_token,
         "latent_end_source": model.latent_end_source,
         "latent_end_validation_status": "validated",
     }

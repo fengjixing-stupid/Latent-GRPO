@@ -153,21 +153,24 @@ class ConfigTests(unittest.TestCase):
         class Tokenizer:
             vocab_size = 600
 
-            def convert_ids_to_tokens(self, token_id: int) -> str:
-                return "<|latent_end|>" if token_id == 524 else "<other>"
+            def encode(self, text: str, add_special_tokens: bool = True) -> list[int]:
+                if text == "</think>" and add_special_tokens is False:
+                    return [524, 125, 29]
+                return [1]
 
         class ModelMetadata:
             vocab_size = 600
 
         result = validate_latent_end_token(config.model, Tokenizer(), ModelMetadata())
         self.assertEqual(result["latent_end_token_id"], 524)
+        self.assertEqual(result["latent_end_token"], "</think>")
         self.assertEqual(result["latent_end_validation_status"], "validated")
 
         class WrongTokenizer(Tokenizer):
-            def convert_ids_to_tokens(self, token_id: int) -> str:
-                return "<wrong>"
+            def encode(self, text: str, add_special_tokens: bool = True) -> list[int]:
+                return [525, 125, 29]
 
-        with self.assertRaisesRegex(ConfigError, "does not match"):
+        with self.assertRaisesRegex(ConfigError, "first tokenizer ID"):
             validate_latent_end_token(config.model, WrongTokenizer(), ModelMetadata())
 
         class SmallModelMetadata:

@@ -18,7 +18,7 @@ batch:
 model:
   path: DJCheng/LLaMA3.2-1B-Instruct-Latent-SFT-Top10
   latent_end_token_id: 524
-  latent_end_token: <|latent_end|>
+  latent_end_token: "</think>"
   latent_end_source: profile_candidate_requires_target_tokenizer_validation
   use_remove_padding: true
   enable_gradient_checkpointing: false

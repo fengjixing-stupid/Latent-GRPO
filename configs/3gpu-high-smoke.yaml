@@ -18,7 +18,7 @@ batch:
 model:
   path: DJCheng/Qwen2.5-Math-7B-Latent-SFT-4k-Top10
   latent_end_token_id: 522
-  latent_end_token: <|latent_end|>
+  latent_end_token: "</think>"
   latent_end_source: profile_candidate_requires_target_tokenizer_validation
   use_remove_padding: true
   enable_gradient_checkpointing: true
