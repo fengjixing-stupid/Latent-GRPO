@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+import ast
+from pathlib import Path
+import unittest
+
+ROOT = Path(__file__).resolve().parents[2]
+CONFIG = ROOT / "latent_grpo_runner/config.py"
+ACTOR = ROOT / "Latent-GRPO/verl-0.4.x/verl/workers/actor/dp_actor.py"
+TORCH_FUNCTIONAL = ROOT / "Latent-GRPO/verl-0.4.x/verl/utils/torch_functional.py"
+FSDP = ROOT / "Latent-GRPO/verl-0.4.x/verl/workers/fsdp_workers.py"
+SGLANG_ROLLOUT = ROOT / "Latent-GRPO/verl-0.4.x/verl/workers/rollout/sglang_rollout/sglang_rollout.py"
+SGLANG_SAMPLER = ROOT / "Latent-GRPO/sglang_latent_reasoning_pkg/python/sglang/srt/layers/sampler.py"
+
+
+def _extract_function(path: Path, name: str, namespace: dict):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    node = next(item for item in tree.body if isinstance(item, ast.FunctionDef) and item.name == name)
+    module = ast.Module(body=[node], type_ignores=[])
+    ast.fix_missing_locations(module)
+    exec(compile(module, str(path), "exec"), namespace)
+    return namespace[name]
+
+
+class T4RuntimeSemanticTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        try:
+            import torch
+            import torch.nn.functional as F
+        except ModuleNotFoundError as error:
+            raise unittest.SkipTest(f"torch unavailable: {error}")
+        cls.torch = torch
+        cls.F = F
+
+    def test_shared_mixture_is_shape_equivalent_to_packed_formula(self):
+        torch = self.torch
+        fn = _extract_function(ACTOR, "_latent_mixture_weights", {"torch": torch})
+        ids = torch.tensor([
+            [[3, -100, -100], [2, 4, 6]],
+            [[7, -100, -100], [1, 5, 8]],
+        ])
+        scores = torch.tensor([
+            [[0.5, -3.0, -4.0], [0.2, 0.1, -0.4]],
+            [[0.7, -2.0, -2.5], [-0.1, 0.4, 0.2]],
+        ])
+        hard_padded, weights_padded = fn(ids, scores, 1.0)
+        hard_flat, weights_flat = fn(ids.reshape(-1, 3), scores.reshape(-1, 3), 1.0)
+        self.assertTrue(torch.equal(hard_padded.reshape(-1), hard_flat))
+        self.assertTrue(torch.allclose(weights_padded.reshape(-1, 3), weights_flat, atol=0, rtol=0))
+
+    def test_flipgrad_keeps_forward_value_and_changes_gradient_route(self):
+        torch = self.torch
+        fn = _extract_function(
+            TORCH_FUNCTIONAL,
+            "logprobs_from_logits_topk_gumbel",
+            {"torch": torch, "F": self.F},
+        )
+        base = torch.tensor([[2.0, 1.0, 0.0]], requires_grad=True)
+        ids = torch.tensor([[0, 1]])
+        with torch.no_grad():
+            topk_logp = base.detach().float().log_softmax(-1).gather(-1, ids)
+            scores = topk_logp - 0.5
+        labels = torch.tensor([0])
+        standard = fn(base, ids, scores, labels, 1.0, 1.0, advantages=None)
+        standard.sum().backward()
+        grad_standard = base.grad.detach().clone()
+
+        flipped_logits = base.detach().clone().requires_grad_(True)
+        flipped = fn(
+            flipped_logits, ids, scores, labels, 1.0, 1.0,
+            advantages=torch.tensor([-1.0]),
+        )
+        flipped.sum().backward()
+        self.assertTrue(torch.allclose(standard.detach(), flipped.detach(), atol=0, rtol=0))
+        self.assertFalse(torch.allclose(grad_standard, flipped_logits.grad))
+
+    def test_padded_actor_reuses_same_latent_and_flipgrad_inputs(self):
+        source = ACTOR.read_text(encoding="utf-8")
+        self.assertIn("_latent_mixture_weights", source)
+        self.assertIn("padded latent path: same Top-K/Gumbel semantics", source)
+        self.assertIn("inputs_embeds=topk_embs_final.detach()", source)
+        self.assertIn("next_topk_ids = rollout_topk_ids[:, -response_length:, :]", source)
+        self.assertIn("next_topk_gumbels = rollout_topk_gumbels[:, -response_length:, :]", source)
+        self.assertIn("advantages=advantages", source)
+        self.assertIn("component_log_probs = full_current_topk_logits.detach().float()", source)
+
+    def test_t4_changes_attention_not_sampling_backend(self):
+        config_source = CONFIG.read_text(encoding="utf-8")
+        fsdp = FSDP.read_text(encoding="utf-8")
+        rollout = SGLANG_ROLLOUT.read_text(encoding="utf-8")
+        self.assertIn("actor_rollout_ref.rollout.engine_kwargs.sglang.attention_backend", config_source)
+        self.assertNotIn("actor_rollout_ref.rollout.sampling_backend", config_source)
+        self.assertIn('attention_implementation = "flash_attention_2" if use_remove_padding else "sdpa"', fsdp)
+        self.assertIn("attention_backend=attention_backend", rollout)
+        self.assertIn("sampling_backend=self.config.get", rollout)
+        self.assertIn("'flashinfer'", rollout)
+        self.assertNotIn("sampling_backend='pytorch'", rollout)
+
+    def test_author_latent_sampler_precedes_backend_and_overrides_latent_ids(self):
+        source = SGLANG_SAMPLER.read_text(encoding="utf-8")
+        latent = source.index("if enable_latent:")
+        backend = source.index('global_server_args_dict["sampling_backend"] == "flashinfer"')
+        override = source.index("sampling_info.latent_modes,", backend)
+        self.assertLess(latent, backend)
+        self.assertLess(backend, override)
+        self.assertIn("latent_batch_next_token_ids", source[latent:override + 200])
+
+
+if __name__ == "__main__":
+    unittest.main()

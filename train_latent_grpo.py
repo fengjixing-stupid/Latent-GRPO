@@ -80,6 +80,7 @@ def main(argv: list[str] | None = None) -> int:
         mode="target",
         require_gpus=config.hardware.required_gpus,
         min_vram_gb=config.hardware.min_vram_gb,
+        required_precision=config.rollout.dtype,
         workspace_root=workspace_root,
     )
     if target_report["failure_reasons"] and not args.allow_hardware_mismatch:

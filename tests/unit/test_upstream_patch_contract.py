@@ -249,7 +249,7 @@ class UpstreamPatchContractTests(unittest.TestCase):
         self.assertIn('global_server_args_dict.get("latent_end_token_id")', source)
         self.assertIn("latent_end_token_id is required", source)
 
-    def test_dynamic_batch_and_fused_latent_paths_fail_safe_and_flash_is_required(self) -> None:
+    def test_dynamic_batch_and_fused_latent_paths_fail_safe_and_padded_path_is_supported(self) -> None:
         trainer_source = _source("verl-0.4.x/verl/trainer/ppo/ray_trainer.py")
         actor_source = _source("verl-0.4.x/verl/workers/actor/dp_actor.py")
 
@@ -258,12 +258,22 @@ class UpstreamPatchContractTests(unittest.TestCase):
             trainer_source,
             _function(trainer_source, "_validate_latent_instrumentation_config"),
         )
+        actor_forward_source = ast.get_source_segment(
+            actor_source,
+            _function(actor_source, "_forward_micro_batch"),
+        )
         self.assertIn("_validate_latent_instrumentation_config(", validate_source)
         self.assertIn("latent instrumentation requires actor.use_dynamic_bsz=false", guard_source)
         self.assertIn("latent instrumentation requires rollout.log_prob_use_dynamic_bsz=false", guard_source)
         self.assertIn("latent instrumentation requires use_fused_kernels=false", guard_source)
-        self.assertIn("latent instrumentation requires model.use_remove_padding=true", guard_source)
-        self.assertIn("FlashAttention cross entropy is required for latent Gumbel log-prob", actor_source)
+        self.assertNotIn("latent instrumentation requires model.use_remove_padding=true", guard_source)
+        self.assertIn(
+            "padded latent path requires actor.ulysses_sequence_parallel_size=1",
+            guard_source,
+        )
+        self.assertIn("_require_remove_padding_runtime(self.use_remove_padding)", actor_forward_source)
+        self.assertIn("padded latent path: same Top-K/Gumbel semantics", actor_forward_source)
+        self.assertGreaterEqual(actor_forward_source.count("logprobs_from_logits_topk_gumbel("), 2)
 
 
 if __name__ == "__main__":

@@ -49,18 +49,35 @@ class _Config(dict):
 
 
 class SamplerGuardTests(unittest.TestCase):
-    def test_flash_attention_guard_rejects_only_latent_gumbel_path(self) -> None:
+    def test_padded_latent_path_preserves_gumbel_flipgrad_and_packed_helpers_guard(self) -> None:
         require = _load_function(
             "verl-0.4.x/verl/workers/actor/dp_actor.py",
-            "_require_flash_attention_cross_entropy",
-            {"verl_F": SimpleNamespace(FLAH_ATTN_CROSS_ENTROPY_LOSS_AVAILABLE=False)},
+            "_require_remove_padding_runtime",
+            {
+                "index_first_axis": None,
+                "pad_input": None,
+                "rearrange": None,
+                "unpad_input": None,
+            },
         )
-        require(add_noise_gumbel_softmax=False)
+        require(use_remove_padding=False)
         with self.assertRaisesRegex(
             RuntimeError,
-            "FlashAttention cross entropy is required for latent Gumbel log-prob",
+            "use_remove_padding=True requires flash_attn bert_padding helpers",
         ):
-            require(add_noise_gumbel_softmax=True)
+            require(use_remove_padding=True)
+
+        actor_source = _source("verl-0.4.x/verl/workers/actor/dp_actor.py")
+        actor_tree = ast.parse(actor_source)
+        forward = next(
+            item
+            for item in ast.walk(actor_tree)
+            if isinstance(item, ast.FunctionDef) and item.name == "_forward_micro_batch"
+        )
+        forward_source = ast.get_source_segment(actor_source, forward)
+        self.assertIn("padded latent path: same Top-K/Gumbel semantics", forward_source)
+        self.assertGreaterEqual(forward_source.count("logprobs_from_logits_topk_gumbel("), 2)
+        self.assertIn("advantages=advantages", forward_source)
 
         source = _source("verl-0.4.x/verl/utils/torch_functional.py")
         tree = ast.parse(source)
@@ -70,8 +87,13 @@ class SamplerGuardTests(unittest.TestCase):
             if isinstance(item, ast.FunctionDef) and item.name == "logprobs_from_logits_topk_gumbel"
         )
         function_source = ast.get_source_segment(source, latent_logprob)
-        self.assertNotIn("output = logprobs_from_logits_v2(logits, labels)", function_source)
-        self.assertIn("FlashAttention cross entropy is required for latent Gumbel log-prob", function_source)
+        self.assertNotIn("FLAH_ATTN_CROSS_ENTROPY_LOSS_AVAILABLE", function_source)
+        self.assertNotIn("FlashAttention cross entropy is required for latent Gumbel log-prob", function_source)
+        self.assertIn("need_flip_mask = (adv_expanded <= 0) & (raw_diff < 0)", function_source)
+        self.assertIn(
+            "output_gumbel_std.detach() + (grad_proxy - grad_proxy.detach())",
+            function_source,
+        )
 
     def test_latent_instrumentation_config_rejects_each_unsupported_path(self) -> None:
         validate = _load_function(

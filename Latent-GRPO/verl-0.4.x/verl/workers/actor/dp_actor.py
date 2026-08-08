@@ -35,11 +35,17 @@ from verl.utils.fsdp_utils import FSDPModule, fsdp2_clip_grad_norm_
 from verl.utils.py_functional import append_to_dict
 from verl.utils.seqlen_balancing import get_reverse_idx, rearrange_micro_batches
 from verl.utils.torch_functional import logprobs_from_logits, logprobs_from_logits_topk_gumbel, top_p_renorm_logprobs
+from verl.utils.torch_dtypes import PrecisionType
 from verl.utils.ulysses import gather_outpus_and_unpad, ulysses_pad, ulysses_pad_and_slice_inputs, \
     ulysses_pad_and_slice_inputs_3d
 from verl.workers.actor import BasePPOActor
+index_first_axis = pad_input = rearrange = unpad_input = None
 if is_cuda_available:
-    from flash_attn.bert_padding import index_first_axis, pad_input, rearrange, unpad_input
+    try:
+        from flash_attn.bert_padding import index_first_axis, pad_input, rearrange, unpad_input
+    except ImportError:
+        # The T4 padded latent path intentionally does not require FlashAttention.
+        pass
 elif is_npu_available:
     from transformers.integrations.npu_flash_attention import index_first_axis, pad_input, rearrange, unpad_input
 
@@ -51,12 +57,28 @@ LATENT_GRPO_STAGE2_DEFINITION_VERSION = "stage2_surrogate_v1"
 LATENT_GRPO_NEAR_ZERO_THRESHOLD = 1e-6
 
 
-def _require_flash_attention_cross_entropy(add_noise_gumbel_softmax):
-    """Reject the semantically incorrect label-log-prob fallback."""
-    if add_noise_gumbel_softmax and not verl_F.FLAH_ATTN_CROSS_ENTROPY_LOSS_AVAILABLE:
+def _require_remove_padding_runtime(use_remove_padding):
+    """Require FlashAttention padding helpers only for the packed actor path."""
+    if use_remove_padding and any(
+        helper is None for helper in (index_first_axis, pad_input, rearrange, unpad_input)
+    ):
         raise RuntimeError(
-            "FlashAttention cross entropy is required for latent Gumbel log-prob"
+            "use_remove_padding=True requires flash_attn bert_padding helpers; "
+            "use the validated padded latent path on Turing/T4"
         )
+
+
+def _latent_mixture_weights(rollout_topk_ids, rollout_topk_gumbels, gumbel_temperature):
+    """Exact latent mixture used by both packed and padded actor paths."""
+    hard_token_mask = (rollout_topk_ids[..., 1:] == -100).all(dim=-1)
+    masked_gumbels = rollout_topk_gumbels.clone()
+    masked_gumbels[..., 1:] = masked_gumbels[..., 1:].masked_fill(
+        hard_token_mask.unsqueeze(-1), -torch.inf
+    )
+    weights = torch.softmax(masked_gumbels / gumbel_temperature, dim=-1).to(
+        rollout_topk_gumbels.dtype
+    )
+    return hard_token_mask, weights
 
 
 class DataParallelPPOActor(BasePPOActor):
@@ -77,6 +99,9 @@ class DataParallelPPOActor(BasePPOActor):
             else verl_F.entropy_from_logits
         )
         self.device_name = get_device_name()
+        self.runtime_dtype = PrecisionType.to_dtype(
+            self.config.get("runtime_dtype", "bfloat16")
+        )
 
         # Optional, bounded observer state.  The default remains disabled and
         # does not change the actor's public return values.
@@ -187,7 +212,7 @@ class DataParallelPPOActor(BasePPOActor):
                              add_noise_gumbel_softmax=True, collect_component_stats=False,
                              component_response_mask=None) -> Tuple[
         torch.Tensor, torch.Tensor]:
-        _require_flash_attention_cross_entropy(add_noise_gumbel_softmax)
+        _require_remove_padding_runtime(self.use_remove_padding)
 
         def safe_lookup_embeddings(fsdp_wrapped_module, input_ids, target_device=None, target_dtype=None):
             """Look up embeddings safely when the module is wrapped by FSDP."""
@@ -222,7 +247,7 @@ class DataParallelPPOActor(BasePPOActor):
             for key in micro_batch["multi_modal_inputs"][0].keys():
                 multi_modal_inputs[key] = torch.cat([inputs[key] for inputs in micro_batch["multi_modal_inputs"]],
                                                     dim=0)
-        with torch.autocast(device_type=self.device_name, dtype=torch.bfloat16):
+        with torch.autocast(device_type=self.device_name, dtype=self.runtime_dtype):
             input_ids = micro_batch["input_ids"] # whole sentences B*n:I+O
             rollout_topk_ids = micro_batch["rollout_topk_ids"]
             rollout_topk_gumbels = micro_batch["rollout_topk_gumbels"]
@@ -253,7 +278,9 @@ class DataParallelPPOActor(BasePPOActor):
                                                           indices).transpose(0, 1)
 
                 # for compute the log_prob
-                hard_token_mask = (topk_ids_rmpad[:, 1:] == -100).all(dim=-1) # (total_nnz,)
+                hard_token_mask, gumbel_y = _latent_mixture_weights(
+                    topk_ids_rmpad, topk_gumbels_rmpad, gumbel_temperature
+                )
                 
                 # Step 1: Always lookup the first candidate (this is the only candidate for hard tokens)
                 # We use safe_lookup_embeddings which now handles -100 safely.
@@ -272,11 +299,7 @@ class DataParallelPPOActor(BasePPOActor):
                     # as long as we use the correct mask for the gumbel noise.
                     mask_expanded = hard_token_mask.unsqueeze(-1) # (total_nnz, 1)
                     
-                    # Prepare Gumbel weights
-                    masked_gumbels = topk_gumbels_rmpad.clone()
-                    masked_gumbels[:, 1:] = masked_gumbels[:, 1:].masked_fill(mask_expanded, -torch.inf)
-                    gumbel_y = torch.softmax(masked_gumbels / gumbel_temperature, dim=-1).to(topk_gumbels_rmpad.dtype)
-                    
+                    # Gumbel weights were produced by the shared exact mixture helper.
                     # Full lookup (only if there are soft tokens)
                     topk_embs = safe_lookup_embeddings(
                         self.actor_module,
@@ -285,7 +308,7 @@ class DataParallelPPOActor(BasePPOActor):
                         target_dtype=topk_gumbels_rmpad.dtype
                     ) # (total_nnz, K, dim)
                     
-                    soft_embs = torch.sum(gumbel_y.unsqueeze(-1).float() * topk_embs.float(), dim=1).to(torch.bfloat16) # (total_nnz, dim)
+                    soft_embs = torch.sum(gumbel_y.unsqueeze(-1).float() * topk_embs.float(), dim=1).to(self.runtime_dtype) # (total_nnz, dim)
                     
                     # Output is hard_embs for hard tokens, soft_embs for soft tokens
                     topk_embs_final = torch.where(mask_expanded, all_first_embs, soft_embs)
@@ -521,31 +544,104 @@ class DataParallelPPOActor(BasePPOActor):
                     entropy = full_entropy.squeeze(-1)[:, -response_length - 1: -1]  # (bsz, response_length)
                 log_probs = full_log_probs.squeeze(-1)[:, -response_length - 1: -1]  # (bsz, response_length)
                 full_current_topk_logits = full_current_topk_logits.squeeze(-1)[:, -response_length - 1: -1]  # (bsz, response_length)
-            else:  # not using rmpad and no ulysses sp
-                extra_args = {}
+            else:  # padded latent path: same Top-K/Gumbel semantics, no packed FlashAttention
+                if self.use_ulysses_sp:
+                    raise RuntimeError("padded latent path requires ulysses_sequence_parallel_size=1")
                 if self.use_fused_kernels:
-                    extra_args["temperature"] = temperature
+                    raise RuntimeError("padded latent path requires use_fused_kernels=False")
+
+                hard_token_mask, gumbel_y = _latent_mixture_weights(
+                    rollout_topk_ids, rollout_topk_gumbels, gumbel_temperature
+                )
+                mask_expanded = hard_token_mask.unsqueeze(-1)
+                all_first_embs = safe_lookup_embeddings(
+                    self.actor_module,
+                    rollout_topk_ids[..., :1],
+                    target_device=rollout_topk_gumbels.device,
+                    target_dtype=rollout_topk_gumbels.dtype,
+                ).squeeze(-2)
+                topk_embs_all = safe_lookup_embeddings(
+                    self.actor_module,
+                    rollout_topk_ids,
+                    target_device=rollout_topk_gumbels.device,
+                    target_dtype=rollout_topk_gumbels.dtype,
+                )
+                soft_embs = torch.sum(
+                    gumbel_y.unsqueeze(-1).float() * topk_embs_all.float(), dim=-2
+                ).to(self.runtime_dtype)
+                topk_embs_final = torch.where(mask_expanded, all_first_embs, soft_embs)
+
                 output = self.actor_module(
-                    input_ids=input_ids,
+                    inputs_embeds=topk_embs_final.detach(),
                     attention_mask=attention_mask,
                     position_ids=position_ids,
                     **multi_modal_inputs,
                     use_cache=False,
-                    **extra_args,
-                )  # prevent model thinks we are generating
+                )
+                logits_full = output.logits
+                response_logits = logits_full[:, -response_length - 1: -1, :]
+                next_topk_ids = rollout_topk_ids[:, -response_length:, :]
+                next_topk_gumbels = rollout_topk_gumbels[:, -response_length:, :]
+                advantages = micro_batch.get("advantages", None)
 
-                if self.use_fused_kernels:
-                    log_probs = output.log_probs[:, -response_length - 1: -1]
-                    entropy = output.entropy[:, -response_length - 1: -1]  # (bsz, response_length)
-
+                if add_noise_gumbel_softmax:
+                    log_probs = logprobs_from_logits_topk_gumbel(
+                        logits=response_logits,
+                        rollout_topk_ids=next_topk_ids,
+                        rollout_topk_gumbels=next_topk_gumbels,
+                        labels=micro_batch["responses"],
+                        top_p=top_p,
+                        temperature=temperature,
+                        inplace_backward=not calculate_entropy,
+                        advantages=advantages,
+                    )
                 else:
-                    logits = output.logits
+                    full_logprobs = top_p_renorm_logprobs(response_logits / temperature, top_p)
+                    log_probs = full_logprobs.gather(
+                        -1, micro_batch["responses"].unsqueeze(-1)
+                    ).squeeze(-1)
 
-                    logits.div_(temperature)
-                    logits = logits[:, -response_length - 1: -1, :]  # (bsz, response_length, vocab_size)
-                    log_probs = logprobs_from_logits(logits, micro_batch["responses"])
-                    if calculate_entropy:
-                        entropy = verl_F.entropy_from_logits(logits)  # (bsz, response_length)
+                if calculate_entropy:
+                    entropy = self.compute_entropy_from_logits(response_logits)
+
+                safe_next_ids = next_topk_ids.clone()
+                safe_next_ids[safe_next_ids == -100] = 0
+                full_current_topk_logits = response_logits.gather(-1, safe_next_ids)
+
+                if collect_component_stats:
+                    if not add_noise_gumbel_softmax:
+                        self._record_component_stats_unavailable("gumbel_path_disabled")
+                    elif advantages is None:
+                        self._record_component_stats_unavailable("advantages_unavailable")
+                    elif component_response_mask is None:
+                        self._record_component_stats_unavailable("component_response_mask_unavailable")
+                    elif component_response_mask.shape != advantages.shape:
+                        self._record_component_stats_unavailable("component_response_mask_shape_mismatch")
+                    else:
+                        with torch.no_grad():
+                            component_log_probs = full_current_topk_logits.detach().float() - torch.logsumexp(
+                                response_logits.detach().float(), dim=-1, keepdim=True
+                            )
+                            surrogate_margins = next_topk_gumbels.detach().float() - component_log_probs
+                            valid_latent_positions = component_response_mask.detach().bool() & ~(
+                                next_topk_ids[..., 1:] == -100
+                            ).all(dim=-1)
+                            valid_components = valid_latent_positions.unsqueeze(-1) & (
+                                next_topk_ids != -100
+                            )
+                            flip_mask = (
+                                advantages.detach().float().unsqueeze(-1).expand_as(surrogate_margins) <= 0
+                            ) & (surrogate_margins < 0)
+                        self._record_component_sufficient_stats(
+                            surrogate_margins, valid_components, flip_mask
+                        )
+
+                latent_probs = torch.softmax(logits_full / temperature, dim=-1)
+                full_topk_probs, full_topk_indices = torch.topk(
+                    latent_probs, k=10, dim=-1
+                )
+                full_topk_probs = full_topk_probs[:, :-1, :].contiguous()
+                full_topk_indices = full_topk_indices[:, :-1, :].contiguous()
             
             return entropy, log_probs, full_topk_probs, full_topk_indices, full_current_topk_logits
     def _optimizer_step(self):

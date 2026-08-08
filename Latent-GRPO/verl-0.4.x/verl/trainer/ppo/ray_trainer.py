@@ -406,8 +406,9 @@ def _validate_latent_instrumentation_config(config, observer_enabled):
         raise ValueError("latent instrumentation requires rollout.log_prob_use_dynamic_bsz=false")
     if actor.get("use_fused_kernels", False):
         raise ValueError("latent instrumentation requires use_fused_kernels=false")
-    if not config.actor_rollout_ref.model.get("use_remove_padding", False):
-        raise ValueError("latent instrumentation requires model.use_remove_padding=true")
+    use_remove_padding = bool(config.actor_rollout_ref.model.get("use_remove_padding", False))
+    if not use_remove_padding and actor.get("ulysses_sequence_parallel_size", 1) != 1:
+        raise ValueError("padded latent path requires actor.ulysses_sequence_parallel_size=1")
 
 
 class RayPPOTrainer:

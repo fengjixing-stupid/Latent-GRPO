@@ -86,6 +86,20 @@ class ConfigTests(unittest.TestCase):
                 self.assertIn(component, current, f"upstream Hydra config has no key for {key}")
                 current = current[component]
 
+    def test_optional_sglang_attention_backend_is_exposed_without_sampling_override(self) -> None:
+        contents = (ROOT / "configs" / "smoke.yaml").read_text(encoding="utf-8")
+        contents = contents.replace("  dtype: bfloat16\n", "  dtype: bfloat16\n  attention_backend: triton\n", 1)
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "t4-attention.yaml"
+            path.write_text(contents, encoding="utf-8")
+            config = load_config(path, workspace_root=ROOT)
+        overrides = config.author_hydra_overrides()
+        self.assertIn(
+            "actor_rollout_ref.rollout.engine_kwargs.sglang.attention_backend=triton",
+            overrides,
+        )
+        self.assertFalse(any("sampling_backend" in item for item in overrides))
+
     def test_schema_version_and_bool_integer_fields_are_rejected(self) -> None:
         contents = (ROOT / "configs" / "smoke.yaml").read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory() as temporary_directory:

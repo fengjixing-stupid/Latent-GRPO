@@ -131,70 +131,64 @@ def logprobs_from_logits_topk_dirichlet(logits, rollout_topk_ids, rollout_topk_g
         output = logprobs_from_logits_v2(logits, labels)
     return output
 def logprobs_from_logits_topk_gumbel(logits, rollout_topk_ids, rollout_topk_gumbels, labels, top_p, temperature, inplace_backward=True, advantages=None):
-    if FLAH_ATTN_CROSS_ENTROPY_LOSS_AVAILABLE:
-        batch_dim = logits.shape[:-1]
-        last_dim = logits.shape[-1]
-        k_num = rollout_topk_ids.shape[-1]
-        logits = logits.reshape(-1, last_dim)
-        labels = labels.reshape(-1)
-        rollout_topk_ids = rollout_topk_ids.reshape(-1, k_num)
-        rollout_topk_gumbels = rollout_topk_gumbels.reshape(-1, k_num)
+    """Latent Gumbel likelihood and FlipGrad proxy using native PyTorch math.
 
-        logits_f32 = logits.float()
-        rollout_topk_gumbels_f32 = rollout_topk_gumbels.float()
-        
-        rollout_topk_ids_safe = rollout_topk_ids.clone()
-        rollout_topk_ids_safe[rollout_topk_ids_safe == -100] = 0
-        
-        # Use global log-softmax to match SGLang's log-probability calculation.
-        full_log_probs = logits_f32.log_softmax(dim=-1)
-        topk_log_probs = full_log_probs.gather(-1, rollout_topk_ids_safe)
+    The historical FlashAttention availability guard was unnecessary: this
+    function already computes both latent and standard-token log-probabilities
+    with torch log-softmax/gather operations. Removing that guard changes no
+    likelihood, mask, or straight-through formula.
+    """
+    batch_dim = logits.shape[:-1]
+    last_dim = logits.shape[-1]
+    k_num = rollout_topk_ids.shape[-1]
+    logits = logits.reshape(-1, last_dim)
+    labels = labels.reshape(-1)
+    rollout_topk_ids = rollout_topk_ids.reshape(-1, k_num)
+    rollout_topk_gumbels = rollout_topk_gumbels.reshape(-1, k_num)
 
-        raw_diff = rollout_topk_gumbels_f32 - topk_log_probs 
+    logits_f32 = logits.float()
+    rollout_topk_gumbels_f32 = rollout_topk_gumbels.float()
 
-        # Standard Gumbel log-probability used for the forward value.
-        output_gumbel_std = -raw_diff - (-raw_diff).exp()
-        
-        if advantages is not None:
-            # Reshape advantages to match (N, K) if needed
-            if advantages.dim() == 1:
-                adv_expanded = advantages.unsqueeze(-1).expand_as(raw_diff)
-            else:
-                adv_expanded = advantages.expand_as(raw_diff)
-            
-            # Flip only negative-advantage entries whose raw_diff would push
-            # gradients in the wrong direction.
-            need_flip_mask = (adv_expanded <= 0) & (raw_diff < 0)
-            raw_diff_flipped = -raw_diff
-            output_gumbel_flipped = -raw_diff_flipped - (-raw_diff_flipped).exp()  # = g - e^g
+    rollout_topk_ids_safe = rollout_topk_ids.clone()
+    rollout_topk_ids_safe[rollout_topk_ids_safe == -100] = 0
 
-            # Straight-through estimator: keep the forward ratio consistent
-            # while routing the backward gradient through the proxy.
-            need_flip_float = need_flip_mask.float()
-            grad_proxy = (1.0 - need_flip_float) * output_gumbel_std + need_flip_float * output_gumbel_flipped
-            output_gumbel = output_gumbel_std.detach() + (grad_proxy - grad_proxy.detach())
+    # Use global log-softmax to match SGLang's log-probability calculation.
+    full_log_probs = logits_f32.log_softmax(dim=-1)
+    topk_log_probs = full_log_probs.gather(-1, rollout_topk_ids_safe)
+    raw_diff = rollout_topk_gumbels_f32 - topk_log_probs
+
+    # Standard Gumbel log-probability used for the forward value.
+    output_gumbel_std = -raw_diff - (-raw_diff).exp()
+
+    if advantages is not None:
+        if advantages.dim() == 1:
+            adv_expanded = advantages.unsqueeze(-1).expand_as(raw_diff)
         else:
-            output_gumbel = output_gumbel_std
-        
-        output_gumbel = output_gumbel.sum(-1) / k_num
-        output_gumbel = output_gumbel.to(logits.dtype)
-
-        is_standard_token = (rollout_topk_ids[:, 1:] == -100).all(dim=-1)
-        batch_temps = torch.full((logits.size(0), 1), fill_value=1, device=logits.device, dtype=logits.dtype)
-        batch_temps[is_standard_token] = temperature
-        
-        logits_scaled_f32 = logits_f32 / batch_temps
-        full_logprobs = F.log_softmax(logits_scaled_f32, dim=-1)
-        output_answer = full_logprobs.gather(-1, labels.unsqueeze(-1)).squeeze(-1)
-        
-        output = torch.where(is_standard_token, output_answer, output_gumbel)
-        output = output.view(*batch_dim)
+            adv_expanded = advantages.reshape(-1, 1).expand_as(raw_diff)
+        need_flip_mask = (adv_expanded <= 0) & (raw_diff < 0)
+        raw_diff_flipped = -raw_diff
+        output_gumbel_flipped = -raw_diff_flipped - (-raw_diff_flipped).exp()
+        need_flip_float = need_flip_mask.float()
+        grad_proxy = (1.0 - need_flip_float) * output_gumbel_std + need_flip_float * output_gumbel_flipped
+        output_gumbel = output_gumbel_std.detach() + (grad_proxy - grad_proxy.detach())
     else:
-        raise RuntimeError(
-            "FlashAttention cross entropy is required for latent Gumbel log-prob"
-        )
-        
-    return output
+        output_gumbel = output_gumbel_std
+
+    output_gumbel = output_gumbel.sum(-1) / k_num
+    output_gumbel = output_gumbel.to(logits.dtype)
+
+    is_standard_token = (rollout_topk_ids[:, 1:] == -100).all(dim=-1)
+    batch_temps = torch.full(
+        (logits.size(0), 1), fill_value=1, device=logits.device, dtype=logits.dtype
+    )
+    batch_temps[is_standard_token] = temperature
+    logits_scaled_f32 = logits_f32 / batch_temps
+    full_logprobs = F.log_softmax(logits_scaled_f32, dim=-1)
+    output_answer = full_logprobs.gather(-1, labels.unsqueeze(-1)).squeeze(-1)
+
+    output = torch.where(is_standard_token, output_answer, output_gumbel)
+    return output.view(*batch_dim)
+
 def top_p_renorm_logprobs(logits, top_ps):
     """
     logits: (total_nnz, vocab_size), already scaled by temperature.

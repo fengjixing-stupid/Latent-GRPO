@@ -403,6 +403,9 @@ class SGLangRollout(BaseRollout):
         if first_rank_in_node:
             rank = dist.get_rank()
             os.environ["SGLANG_BLOCK_NONZERO_RANK_CHILDREN"] = "0"
+            engine_kwargs = self.config.get("engine_kwargs", {})
+            sglang_engine_kwargs = engine_kwargs.get("sglang", {}) if engine_kwargs is not None else {}
+            attention_backend = sglang_engine_kwargs.get("attention_backend", None)
             self._engine = AsyncEngine(
                 model_path=actor_module,
                 dtype=self.config.dtype,
@@ -420,6 +423,9 @@ class SGLangRollout(BaseRollout):
                 trust_remote_code=trust_remote_code,
                 enable_latent=self.config.get("enable_latent", False),
                 latent_end_token_id=self.config.get("latent_end_token_id"),
+                attention_backend=attention_backend,
+                # Preserve the author's sampling backend. T4 compatibility only
+                # replaces the attention kernel, never latent/response sampling.
                 sampling_backend=self.config.get("sampling_backend", 'flashinfer'),
                 max_topk=self.config.get("max_topk", 5),
                 # Add rank to prevent SGLang from generating the same port inside PortArgs.init_new

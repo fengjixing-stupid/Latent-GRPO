@@ -79,6 +79,24 @@ class EnvironmentTests(unittest.TestCase):
         )
         self.assertEqual(reasons, ["cuda_driver_wheel_incompatible"])
 
+    def test_t4_fp16_target_does_not_require_bf16(self) -> None:
+        gib = 1024**3
+        reasons = validate_target_environment(
+            {
+                "host_platform": "linux_x86_64",
+                "cuda_available": True,
+                "gpu_count": 2,
+                "gpu_total_memory_bytes": [15 * gib, 15 * gib],
+                "bf16_supported": False,
+                "fp16_supported": True,
+                "nccl_available": True,
+            },
+            require_gpus=2,
+            min_vram_gb=14,
+            required_precision="float16",
+        )
+        self.assertEqual(reasons, [])
+
     def test_target_report_envelope_has_required_machine_readable_fields(self) -> None:
         report = build_report_envelope(
             command=["python", "scripts/check_environment.py", "--mode", "target"],

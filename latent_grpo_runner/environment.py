@@ -29,6 +29,8 @@ _TARGET_PACKAGES = (
     "sgl-kernel",
     "flash-attn",
     "flashinfer-python",
+    "cuda-python",
+    "cuda-bindings",
 )
 
 
@@ -37,6 +39,7 @@ def collect_environment(
     mode: str,
     require_gpus: int = 3,
     min_vram_gb: int = 40,
+    required_precision: str = "bf16",
     workspace_root: str | Path | None = None,
     platform_name: str | None = None,
     machine: str | None = None,
@@ -74,6 +77,8 @@ def collect_environment(
         "cudnn_version": None,
         "nccl_version": None,
         "bf16_supported": False,
+        "fp16_supported": False,
+        "required_precision": _normalize_precision(required_precision),
         "nccl_available": False,
         "distributed_backend": None,
         "world_size": _environment_int("WORLD_SIZE", 1),
@@ -91,7 +96,12 @@ def collect_environment(
         )
         return report
     report.update(_target_gpu_probe())
-    reasons = validate_target_environment(report, require_gpus=require_gpus, min_vram_gb=min_vram_gb)
+    reasons = validate_target_environment(
+        report,
+        require_gpus=require_gpus,
+        min_vram_gb=min_vram_gb,
+        required_precision=required_precision,
+    )
     report["failure_reasons"] = reasons
     report["status"] = "target_machine_probe_passed" if not reasons else "blocked"
     report["training_runtime_validation"] = "target_machine_probe_passed" if not reasons else "target_machine_test_deferred"
@@ -103,6 +113,7 @@ def validate_target_environment(
     *,
     require_gpus: int,
     min_vram_gb: int,
+    required_precision: str = "bf16",
 ) -> list[str]:
     """Return stable target gate reasons in deterministic priority order."""
     reasons: list[str] = []
@@ -118,8 +129,15 @@ def validate_target_environment(
         reasons.append("cuda_unavailable")
     if report.get("cuda_driver_wheel_compatible") is False:
         reasons.append("cuda_driver_wheel_incompatible")
-    if not report.get("bf16_supported", False):
-        reasons.append("bf16_unsupported")
+    precision = _normalize_precision(required_precision)
+    if precision == "bf16":
+        if not report.get("bf16_supported", False):
+            reasons.append("bf16_unsupported")
+    elif precision == "fp16":
+        if not report.get("fp16_supported", False):
+            reasons.append("fp16_unsupported")
+    else:  # defensive; _normalize_precision currently rejects this branch
+        reasons.append("unsupported_precision_requirement")
     if not report.get("nccl_available", False):
         reasons.append("nccl_unavailable")
     return reasons
@@ -179,6 +197,7 @@ def _target_gpu_probe() -> dict[str, Any]:
         "cudnn_version": torch_info["cudnn_version"],
         "nccl_version": torch_info["nccl_version"],
         "bf16_supported": torch_info["bf16_supported"],
+        "fp16_supported": torch_info["fp16_supported"],
         "nccl_available": torch_info["nccl_available"],
         "distributed_backend": "nccl" if torch_info["nccl_available"] else None,
         "torch_version": torch_info["torch_version"],
@@ -229,6 +248,7 @@ def _torch_target_info() -> dict[str, Any]:
             "cudnn_version": None,
             "nccl_version": None,
             "bf16_supported": False,
+            "fp16_supported": False,
             "nccl_available": False,
         }
     cuda_available = bool(torch.cuda.is_available())
@@ -249,6 +269,7 @@ def _torch_target_info() -> dict[str, Any]:
         "cudnn_version": torch.backends.cudnn.version(),
         "nccl_version": nccl_version,
         "bf16_supported": bf16_supported,
+        "fp16_supported": bool(cuda_available),
         "nccl_available": nccl_version is not None,
     }
 
@@ -293,6 +314,15 @@ def _safe_username() -> str:
         return os.getlogin()
     except OSError:
         return os.environ.get("USER", "unknown")
+
+
+def _normalize_precision(value: str) -> str:
+    normalized = str(value).strip().lower()
+    if normalized in {"bf16", "bfloat16"}:
+        return "bf16"
+    if normalized in {"fp16", "float16", "half", "16"}:
+        return "fp16"
+    raise ValueError(f"unsupported target precision: {value}")
 
 
 def _environment_int(name: str, default: int) -> int:

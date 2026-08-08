@@ -68,6 +68,7 @@ _NESTED_KEYS = {
         {
             "name",
             "dtype",
+            "attention_backend",
             "tensor_parallel_size",
             "sequence_parallel_size",
             "max_model_len",
@@ -138,6 +139,7 @@ class DataConfig:
 class RolloutConfig:
     name: str
     dtype: str
+    attention_backend: str | None
     tensor_parallel_size: int
     sequence_parallel_size: int
     max_model_len: int
@@ -281,6 +283,13 @@ class ResolvedConfig:
             "trainer.total_training_steps": self.training.max_steps,
             "trainer.default_local_dir": self.paths["output_root"],
         }
+        if self.rollout.attention_backend is not None:
+            # Attention backend is an engineering/runtime knob. Deliberately do
+            # not expose sampling_backend here: the author latent/response sampler
+            # remains the canonical flashinfer path.
+            values["actor_rollout_ref.rollout.engine_kwargs.sglang.attention_backend"] = (
+                self.rollout.attention_backend
+            )
         if self.resume_from is not None:
             values["trainer.resume_mode"] = "resume_path"
             values["trainer.resume_from_path"] = self.resume_from
@@ -417,6 +426,11 @@ def _build_config(raw: Mapping[str, Any], root: Path) -> ResolvedConfig:
             rollout=RolloutConfig(
                 name=_expect_str(raw["rollout"], "name"),
                 dtype=_expect_str(raw["rollout"], "dtype"),
+                attention_backend=(
+                    None
+                    if raw["rollout"].get("attention_backend") is None
+                    else _expect_str(raw["rollout"], "attention_backend")
+                ),
                 tensor_parallel_size=_expect_int(raw["rollout"], "tensor_parallel_size"),
                 sequence_parallel_size=_expect_int(raw["rollout"], "sequence_parallel_size"),
                 max_model_len=_expect_int(raw["rollout"], "max_model_len"),
@@ -461,6 +475,8 @@ def _validate_semantics(config: ResolvedConfig) -> None:
         raise ConfigError("launcher.mode must be ray_direct or torchrun_control")
     if config.rollout.name != "sglang":
         raise ConfigError("Latent-GRPO profiles must use the observed sglang rollout")
+    if config.rollout.attention_backend not in {None, "flashinfer", "triton", "torch_native"}:
+        raise ConfigError("rollout.attention_backend must be flashinfer, triton, torch_native, or omitted")
     if config.rollout.tensor_parallel_size != 1 or config.rollout.sequence_parallel_size != 1:
         raise ConfigError("initial profiles require TP=1 and SP=1")
     if config.profile_name.startswith("3gpu-") and config.hardware.required_gpus != 3:
