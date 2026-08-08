@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import importlib.metadata as metadata
 import json
 from pathlib import Path
 import subprocess
@@ -52,11 +53,20 @@ def _write(path: Path, report):
     path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
 
+def _version(package: str) -> str | None:
+    try:
+        return metadata.version(package)
+    except metadata.PackageNotFoundError:
+        return None
+
+
 def _runtime_import_checks():
     modules = (
         "sgl_kernel",
         "flashinfer",
         "cuda.bindings",
+        "triton",
+        "torchvision",
         "sglang.srt.layers.sampler",
         "sglang.srt.layers.attention.triton_backend",
         "verl.models.transformers.monkey_patch",
@@ -119,6 +129,35 @@ def main(argv=None):
         gumbel_end = torch_functional.index("def top_p_renorm_logprobs", gumbel_start)
         gumbel_source = torch_functional[gumbel_start:gumbel_end]
         import_checks = _runtime_import_checks()
+
+        # Scope the HF attention check to the actor/reference builder contract.
+        # The critic builder still contains a literal FlashAttention2 setting but
+        # GRPO does not instantiate a critic, so scanning the entire file creates
+        # a false positive for the T4 actor path.
+        actor_attention_dispatch_ok = all(
+            marker in fsdp
+            for marker in (
+                'attention_implementation = "flash_attention_2" if use_remove_padding else "sdpa"',
+                "attn_implementation=attention_implementation",
+            )
+        )
+
+        runtime_versions = {
+            package: _version(package)
+            for package in (
+                "torch",
+                "torchvision",
+                "triton",
+                "transformers",
+                "sglang",
+                "sgl-kernel",
+                "flashinfer-python",
+                "cuda-python",
+                "cuda-bindings",
+                "ray",
+                "pyarrow",
+            )
+        }
         source_checks = {
             "runner_attention_backend_exposed": all(
                 marker in config_source
@@ -130,9 +169,7 @@ def main(argv=None):
             "actor_hardcodes_bfloat16": (
                 "dtype=torch.bfloat16" in actor or ".to(torch.bfloat16)" in actor
             ),
-            "model_forces_flash_attention_2": (
-                'attn_implementation="flash_attention_2"' in fsdp
-            ),
+            "model_forces_flash_attention_2": not actor_attention_dispatch_ok,
             "padded_latent_path_present": all(
                 marker in actor
                 for marker in (
@@ -154,6 +191,8 @@ def main(argv=None):
                 "sampling_backend=self.config.get" in sglang_rollout
                 and "'flashinfer'" in sglang_rollout
             ),
+            "triton_version_ok": str(runtime_versions["triton"] or "").startswith("3.2.0"),
+            "torchvision_version_ok": str(runtime_versions["torchvision"] or "").startswith("0.21.0+cu124"),
             "runtime_imports_ok": all(item["ok"] for item in import_checks.values()),
         }
         report = assess_kaggle_t4_compatibility(environment, **source_checks)
@@ -162,6 +201,7 @@ def main(argv=None):
                 "environment_status": environment.get("status"),
                 "environment_failure_reasons": environment.get("failure_reasons", []),
                 "source_checks": source_checks,
+                "runtime_versions": runtime_versions,
                 "runtime_import_checks": import_checks,
                 **_git_identity(),
             }

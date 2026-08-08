@@ -3,7 +3,8 @@ set -euo pipefail
 
 # Kaggle/T4-only runtime stack. It intentionally does not touch training data.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PYTHON_BIN="${PYTHON_BIN:-python}"
+BOOTSTRAP_PYTHON="${PYTHON_BIN:-python}"
+VENV_DIR="${KAGGLE_T4_VENV:-/kaggle/working/latent-t4-cu124}"
 
 if [[ "$(uname -s)" != "Linux" ]]; then
   echo "BLOCKED: Kaggle T4 runtime stack requires Linux" >&2
@@ -25,43 +26,63 @@ for row in "${T4_GPU_ROWS[@]}"; do
   fi
 done
 
+# Build an isolated Python 3.10 runtime so Kaggle's system Python/Torch cannot
+# leak into the validated SGLang 0.4.6-era stack.
+"${BOOTSTRAP_PYTHON}" -m pip install -q uv
+UV_BIN="$(command -v uv || true)"
+if [[ -z "${UV_BIN}" ]]; then
+  echo "BLOCKED: uv was installed but its executable is not on PATH" >&2
+  exit 6
+fi
+"${UV_BIN}" python install 3.10
+rm -rf "${VENV_DIR}"
+"${UV_BIN}" venv --python 3.10 --seed "${VENV_DIR}"
+PYTHON_BIN="${VENV_DIR}/bin/python"
+
 "${PYTHON_BIN}" -m pip install --upgrade pip setuptools wheel
 "${PYTHON_BIN}" -m pip install \
-  torch==2.6.0 torchvision==0.21.0 \
-  --index-url https://download.pytorch.org/whl/cu118
-"${PYTHON_BIN}" -m pip install cuda-bindings==11.8.6 cuda-python==11.8.6
-"${PYTHON_BIN}" -m pip install \
+  torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
+  --index-url https://download.pytorch.org/whl/cu124
+"${PYTHON_BIN}" -m pip install --no-deps --no-cache-dir sgl-kernel==0.1.0
+"${PYTHON_BIN}" -m pip install --no-deps --no-cache-dir \
   flashinfer-python==0.2.5 \
-  --index-url https://flashinfer.ai/whl/cu118/torch2.6
-"${PYTHON_BIN}" -m pip install \
-  sgl-kernel==0.1.1 \
-  --index-url https://docs.sglang.ai/whl/cu118
-
-"${PYTHON_BIN}" -m pip install \
-  -r "${ROOT}/requirements/runtime-core.txt" \
-  -r "${ROOT}/requirements/metrics.txt" \
-  -r "${ROOT}/requirements/reward-math.txt"
+  --index-url https://flashinfer.ai/whl/cu124/torch2.6
+"${PYTHON_BIN}" -m pip install cuda-python==12.9.0 cuda-bindings==12.9.0
+"${PYTHON_BIN}" -m pip install --no-deps torchao==0.10.0
 
 TMP_REQ="$(mktemp)"
-trap 'rm -f "${TMP_REQ}"' EXIT
-grep -Ev '^(flashinfer-python|sgl-kernel|cuda-python|cuda-bindings)([<=> ]|$)' \
-  "${ROOT}/requirements/runtime-sglang.txt" > "${TMP_REQ}"
-"${PYTHON_BIN}" -m pip install -r "${TMP_REQ}"
+TMP_CONSTRAINTS="$(mktemp)"
+trap 'rm -f "${TMP_REQ}" "${TMP_CONSTRAINTS}"' EXIT
+cat > "${TMP_CONSTRAINTS}" <<'CONSTRAINTS'
+torch==2.6.0
+torchvision==0.21.0
+torchaudio==2.6.0
+triton==3.2.0
+transformers==4.51.1
+sgl-kernel==0.1.0
+flashinfer-python==0.2.5
+cuda-python==12.9.0
+cuda-bindings==12.9.0
+torchao==0.10.0
+CONSTRAINTS
 
-# Install the repository forks without allowing pip to replace the guarded T4 wheels.
+# reward-math is intentionally excluded: this gate is data-free and only
+# establishes the execution/runtime compatibility boundary.
+"${PYTHON_BIN}" -m pip install -c "${TMP_CONSTRAINTS}" \
+  -r "${ROOT}/requirements/runtime-core.txt" \
+  -r "${ROOT}/requirements/metrics.txt"
+
+grep -Ev '^(flashinfer-python|sgl-kernel|cuda-python|cuda-bindings|torchao)([<=> ]|$)' \
+  "${ROOT}/requirements/runtime-sglang.txt" > "${TMP_REQ}"
+"${PYTHON_BIN}" -m pip install -c "${TMP_CONSTRAINTS}" -r "${TMP_REQ}"
+
+# Install repository forks without allowing pip to replace guarded wheels.
 "${PYTHON_BIN}" -m pip install -e \
   "${ROOT}/Latent-GRPO/sglang_latent_reasoning_pkg/python" --no-deps
 "${PYTHON_BIN}" -m pip install -e \
   "${ROOT}/Latent-GRPO/verl-0.4.x" --no-deps
 
-"${PYTHON_BIN}" - <<'PY'
-import importlib.metadata as md
-import torch
-print("torch", torch.__version__, "cuda", torch.version.cuda)
-print("cuda_available", torch.cuda.is_available())
-print("bf16_supported", torch.cuda.is_bf16_supported() if torch.cuda.is_available() else False)
-for package in ("sglang", "sgl-kernel", "flashinfer-python", "cuda-python", "cuda-bindings", "ray", "pyarrow"):
-    print(package, md.version(package))
-PY
+"${PYTHON_BIN}" -c 'import importlib.metadata as md, sys, torch, triton, torchvision, sgl_kernel, flashinfer; assert sys.version_info[:2] == (3, 10), sys.version; assert torch.__version__.startswith("2.6.0+cu124"), torch.__version__; assert torch.version.cuda == "12.4", torch.version.cuda; assert triton.__version__.startswith("3.2.0"), triton.__version__; assert torchvision.__version__.startswith("0.21.0+cu124"), torchvision.__version__; assert torch.cuda.is_available(); assert torch.cuda.device_count() == 2, torch.cuda.device_count(); assert all(torch.cuda.get_device_capability(i) == (7, 5) for i in range(2)); print("T4_BASE_RUNTIME: PASS"); print("python", sys.executable); print("torch", torch.__version__, "cuda", torch.version.cuda); print("triton", triton.__version__); print("torchvision", torchvision.__version__); print("sgl-kernel", md.version("sgl-kernel")); print("flashinfer-python", md.version("flashinfer-python")); print("cuda-python", md.version("cuda-python")); print("cuda-bindings", md.version("cuda-bindings"))'
 
-echo "T4_RUNTIME_STACK_INSTALLED: no training data read or generated"
+echo "T4_RUNTIME_STACK_INSTALLED: ${VENV_DIR}; no training data read or generated"
+echo "NEXT: ${PYTHON_BIN} ${ROOT}/tools/probe_kaggle_p1_t4_compatibility.py"

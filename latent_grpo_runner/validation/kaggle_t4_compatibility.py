@@ -10,17 +10,19 @@ from __future__ import annotations
 from typing import Any, Mapping
 
 EXPECTED_T4_COMPUTE_CAPABILITY = "7.5"
+EXPECTED_PYTHON_PREFIX = "3.10"
 _REQUIRED_PACKAGES = (
-    "torch", "ray", "sglang", "sgl-kernel", "flashinfer-python",
-    "cuda-python", "cuda-bindings", "pyarrow",
+    "torch", "ray", "transformers", "sglang", "sgl-kernel",
+    "flashinfer-python", "cuda-python", "cuda-bindings", "pyarrow",
 )
 _EXPECTED_VERSION_PREFIXES = {
     "torch": "2.6.0",
+    "transformers": "4.51.1",
     "sglang": "0.4.6.post1",
-    "sgl-kernel": "0.1.1",
+    "sgl-kernel": "0.1.0",
     "flashinfer-python": "0.2.5",
-    "cuda-python": "11.8.6",
-    "cuda-bindings": "11.8.6",
+    "cuda-python": "12.9.0",
+    "cuda-bindings": "12.9.0",
 }
 
 
@@ -34,12 +36,16 @@ def assess_kaggle_t4_compatibility(
     gumbel_logprob_requires_flash_attention: bool,
     sglang_triton_attention_forwarded: bool,
     flashinfer_sampling_preserved: bool,
+    triton_version_ok: bool,
+    torchvision_version_ok: bool,
     runtime_imports_ok: bool,
 ) -> dict[str, Any]:
     names = [str(name) for name in environment.get("gpu_names", [])]
     capabilities = [str(value) for value in environment.get("gpu_compute_capabilities", [])]
     blockers: list[str] = []
 
+    if not str(environment.get("python_version") or "").startswith(EXPECTED_PYTHON_PREFIX):
+        blockers.append("expected_python_3_10_runtime")
     if len(names) != 2 or any("T4" not in name.upper() for name in names):
         blockers.append("expected_exactly_two_t4_gpus")
     if len(capabilities) != 2 or any(value != EXPECTED_T4_COMPUTE_CAPABILITY for value in capabilities):
@@ -51,8 +57,8 @@ def assess_kaggle_t4_compatibility(
     if environment.get("fp16_supported") is not True:
         blockers.append("fp16_unavailable_on_t4_runtime")
     cuda_runtime = str(environment.get("cuda_runtime_version") or "")
-    if not cuda_runtime.startswith("11.8"):
-        blockers.append("expected_t4_cuda_runtime_11_8")
+    if not cuda_runtime.startswith("12.4"):
+        blockers.append("expected_t4_cuda_runtime_12_4")
 
     package_status = environment.get("dependency_check_status", {})
     if isinstance(package_status, Mapping):
@@ -67,6 +73,10 @@ def assess_kaggle_t4_compatibility(
                 if not version.startswith(expected_prefix):
                     blockers.append(f"runtime_version_mismatch:{package}:{version}")
 
+    if not triton_version_ok:
+        blockers.append("runtime_version_mismatch:triton")
+    if not torchvision_version_ok:
+        blockers.append("runtime_version_mismatch:torchvision")
     if not runner_attention_backend_exposed:
         blockers.append("runner_sglang_attention_backend_not_exposed")
     if actor_hardcodes_bfloat16:
