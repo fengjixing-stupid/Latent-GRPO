@@ -38,13 +38,15 @@ def build_train_step_metrics(
     metrics_compute_time: Optional[float] = None,
     metrics_write_time: Optional[float] = None,
 ) -> dict:
-    """Build the sole authoritative post-update metrics row on the driver.
+    """Build one authoritative train/probe metrics row on the driver.
 
     ``driver_step_time_seconds`` is intentionally not accepted as a worker
-    statistic: it is the elapsed duration around the complete outer step.
+    statistic.  A pre-backward monitor probe must leave it unavailable because
+    no actor update has completed.
     """
-    if context.observation_phase != "post_update":
-        raise ValueError("train step metrics must be created post_update")
+    if context.observation_phase not in {"post_update", "pre_backward_probe"}:
+        raise ValueError("train step metrics require post_update or pre_backward_probe")
+    is_pre_backward_probe = context.observation_phase == "pre_backward_probe"
     lengths = list(final_training_trajectory_lengths)
     if any(not isinstance(length, int) or length < 0 for length in lengths):
         raise ValueError("trajectory lengths must be non-negative integers")
@@ -76,9 +78,19 @@ def build_train_step_metrics(
     record["train/generated_token_count__unavailable_reason"] = None if generated_available else "empty_effective_mask"
     record["final_training_trajectory_count"] = len(lengths)
     time_available = driver_step_time_seconds is not None and math.isfinite(float(driver_step_time_seconds))
+    if is_pre_backward_probe and time_available:
+        raise ValueError("pre_backward_probe must not report post-update step_time")
     record["train/step_time"] = float(driver_step_time_seconds) if time_available else None
     record["train/step_time__available"] = time_available
-    record["train/step_time__unavailable_reason"] = None if time_available else "missing_runtime_interface"
+    record["train/step_time__unavailable_reason"] = (
+        None
+        if time_available
+        else (
+            "pre_backward_probe_no_actor_update"
+            if is_pre_backward_probe
+            else "missing_runtime_interface"
+        )
+    )
     all_available = all_available and generated_available and time_available
     from .stage2 import Stage2SufficientStats, build_stage2_metrics
     if stage2_statistics is None:

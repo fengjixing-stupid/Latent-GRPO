@@ -260,6 +260,9 @@ algorithm:
 
 trainer:
   balance_batch: True
+  # Engineering-only monitor gate. When true the actor performs the real
+  # forward/loss/observer path and returns before loss.backward().
+  pre_backward_monitor_probe: False
   total_epochs: 30
   total_training_steps: null
   project_name: verl_examples

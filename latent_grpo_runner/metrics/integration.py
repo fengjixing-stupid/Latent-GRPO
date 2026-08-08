@@ -152,7 +152,10 @@ class DurableMetricsObserver:
             raise ObserverIntegrationError("observer facts must be a mapping")
 
         if event_type == "actor_update":
-            self._commit_train_step(facts)
+            self._commit_train_step(facts, observation_phase="post_update")
+            return
+        if event_type == "pre_backward_probe":
+            self._commit_train_step(facts, observation_phase="pre_backward_probe")
             return
 
         # These existing hooks are intentionally accepted at P0 so enabling the
@@ -224,18 +227,24 @@ class DurableMetricsObserver:
                 writer.close()
             raise
 
-    def _commit_train_step(self, facts: Mapping[str, object]) -> None:
+    def _commit_train_step(
+        self, facts: Mapping[str, object], *, observation_phase: str
+    ) -> None:
+        if observation_phase not in {"post_update", "pre_backward_probe"}:
+            raise ObserverIntegrationError("unsupported train-step observation phase")
         global_step = facts.get("global_step")
         update_count = facts.get("update_count")
         aggregation_worker_count = facts.get("aggregation_worker_count")
         if type(global_step) is not int or global_step < 1:
-            raise ObserverIntegrationError("actor_update requires positive integer global_step")
-        if facts.get("observation_phase") != "post_update":
-            raise ObserverIntegrationError("actor_update must be emitted at post_update")
+            raise ObserverIntegrationError("train-step event requires positive integer global_step")
+        if facts.get("observation_phase") != observation_phase:
+            raise ObserverIntegrationError("train-step event observation phase mismatch")
         if facts.get("optimizer_update_available") is not True:
             raise ObserverIntegrationError("authoritative optimizer_step unavailable from worker consensus")
         if type(update_count) is not int or update_count < 0:
-            raise ObserverIntegrationError("actor_update requires non-negative integer update_count")
+            raise ObserverIntegrationError("train-step event requires non-negative integer update_count")
+        if observation_phase == "pre_backward_probe" and update_count != 0:
+            raise ObserverIntegrationError("pre-backward probe must not perform an optimizer update")
         if type(aggregation_worker_count) is not int or aggregation_worker_count < 1:
             raise ObserverIntegrationError("actor_update requires positive aggregation_worker_count")
 
@@ -260,8 +269,10 @@ class DurableMetricsObserver:
                 raise ObserverIntegrationError("P1 sufficient statistics must be mappings")
             if not isinstance(trajectory_lengths, (list, tuple)):
                 raise ObserverIntegrationError("P1 final trajectory lengths must be a sequence")
-            if type(step_time) not in {int, float}:
-                raise ObserverIntegrationError("P1 driver step time must be numeric")
+            if observation_phase == "post_update" and type(step_time) not in {int, float}:
+                raise ObserverIntegrationError("P1 post-update driver step time must be numeric")
+            if observation_phase == "pre_backward_probe" and step_time is not None:
+                raise ObserverIntegrationError("P1 pre-backward probe must not report step time")
             learning_rate = facts.get("learning_rate")
             metrics_compute_time = facts.get("metrics_compute_time")
             context = StepContext(
@@ -269,7 +280,7 @@ class DurableMetricsObserver:
                 seed=self.seed,
                 global_step=global_step,
                 optimizer_step=next_optimizer_step,
-                observation_phase="post_update",
+                observation_phase=observation_phase,
                 learning_rate=(
                     float(learning_rate) if type(learning_rate) in {int, float} else None
                 ),
@@ -282,7 +293,9 @@ class DurableMetricsObserver:
                     worker_statistics=worker_statistics,
                     driver_statistics=driver_statistics,
                     final_training_trajectory_lengths=trajectory_lengths,
-                    driver_step_time_seconds=float(step_time),
+                    driver_step_time_seconds=(
+                        None if step_time is None else float(step_time)
+                    ),
                     aggregation_worker_count=aggregation_worker_count,
                     metrics_compute_time=(
                         float(metrics_compute_time)

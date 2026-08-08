@@ -20,6 +20,9 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--output-root")
     parser.add_argument("--resume-from")
     parser.add_argument("--max-steps", type=int)
+    parser.add_argument("--model-path", help="HF repo ID or local author SFT model directory")
+    parser.add_argument("--train-files", help="Training parquet path for an engineering probe")
+    parser.add_argument("--val-files", help="Validation/test parquet path for an engineering probe")
     parser.add_argument("--log-level", default="INFO")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--validate-config", action="store_true")
@@ -47,6 +50,9 @@ def main(argv: list[str] | None = None) -> int:
             output_root=Path(args.output_root) if args.output_root else None,
             max_steps=args.max_steps,
             resume_from=Path(args.resume_from) if args.resume_from else None,
+            model_path=args.model_path,
+            train_files=args.train_files,
+            val_files=args.val_files,
             metrics_enabled=args.metrics_enabled,
             support_enabled=args.support_enabled,
             checkpoint_probe_enabled=args.checkpoint_probe_enabled,
@@ -91,6 +97,8 @@ def main(argv: list[str] | None = None) -> int:
 
         tokenizer = AutoTokenizer.from_pretrained(config.model.path)
         model_metadata = AutoConfig.from_pretrained(config.model.path)
+        if config.profile_name == "kaggle-t4-monitor" and getattr(model_metadata, "quantization_config", None):
+            raise ConfigError("kaggle-t4-monitor requires the unquantized author SFT model")
         latent_end_validation = validate_latent_end_token(config.model, tokenizer, model_metadata)
         print(json.dumps({"latent_end_validation": latent_end_validation}, sort_keys=True))
     except (ConfigError, ModuleNotFoundError, OSError, ValueError) as error:

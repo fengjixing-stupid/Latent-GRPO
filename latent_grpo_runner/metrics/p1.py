@@ -173,14 +173,17 @@ def build_p1_train_step_metrics(
     worker_statistics: Mapping[str, Any],
     driver_statistics: Mapping[str, Any],
     final_training_trajectory_lengths: Sequence[int],
-    driver_step_time_seconds: float,
+    driver_step_time_seconds: float | None,
     aggregation_worker_count: int,
     metrics_compute_time: float | None = None,
 ) -> dict[str, Any]:
     """Build the one authoritative Stage 1/2 row from global sufficient stats."""
     if type(aggregation_worker_count) is not int or aggregation_worker_count < 1:
         raise P1AggregationError("aggregation_worker_count must be positive")
-    if not math.isfinite(float(driver_step_time_seconds)) or driver_step_time_seconds < 0:
+    if driver_step_time_seconds is None:
+        if context.observation_phase != "pre_backward_probe":
+            raise P1AggregationError("driver_step_time_seconds is required post-update")
+    elif not math.isfinite(float(driver_step_time_seconds)) or driver_step_time_seconds < 0:
         raise P1AggregationError("driver_step_time_seconds must be finite and non-negative")
 
     stage1_statistics = {
@@ -209,9 +212,15 @@ def build_p1_train_step_metrics(
         context,
         stage1_statistics,
         final_training_trajectory_lengths,
-        driver_step_time_seconds=float(driver_step_time_seconds),
+        driver_step_time_seconds=(
+            None if driver_step_time_seconds is None else float(driver_step_time_seconds)
+        ),
         stage2_statistics=stage2_statistics,
         aggregation_worker_count=aggregation_worker_count,
-        record_version="metrics_record_p1_v1",
+        record_version=(
+            "metrics_record_p1_pre_backward_probe_v1"
+            if context.observation_phase == "pre_backward_probe"
+            else "metrics_record_p1_v1"
+        ),
         metrics_compute_time=metrics_compute_time,
     )

@@ -12,7 +12,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class ConfigTests(unittest.TestCase):
     def test_all_supported_profiles_parse_and_have_deterministic_hashes(self) -> None:
-        for name in ("smoke", "3gpu-low", "3gpu-high-smoke"):
+        for name in ("smoke", "3gpu-low", "3gpu-high-smoke", "kaggle-t4-monitor"):
             config = load_config(ROOT / "configs" / f"{name}.yaml", workspace_root=ROOT)
             self.assertEqual(config.profile_name, name)
             self.assertEqual(len(config.config_hash), 64)
@@ -20,6 +20,42 @@ class ConfigTests(unittest.TestCase):
                 ROOT / "configs" / f"{name}.yaml", workspace_root=ROOT
             ).config_hash)
             self.assertTrue(config.features.metrics_enabled)
+
+    def test_kaggle_monitor_profile_is_fail_closed_before_backward(self) -> None:
+        config = load_config(ROOT / "configs" / "kaggle-t4-monitor.yaml", workspace_root=ROOT)
+        self.assertEqual(config.hardware.required_gpus, 2)
+        self.assertEqual(config.batch_arithmetic(), (1, 1, 1, 1))
+        self.assertTrue(config.training.pre_backward_monitor_probe)
+        self.assertEqual(config.rollout.dtype, "float16")
+        self.assertEqual(config.rollout.attention_backend, "triton")
+        self.assertFalse(config.model.use_remove_padding)
+        self.assertTrue(config.model.enable_gradient_checkpointing)
+        self.assertTrue(config.model.actor_param_offload)
+        self.assertTrue(config.model.actor_optimizer_offload)
+        self.assertTrue(config.model.ref_param_offload)
+        overrides = config.author_hydra_overrides()
+        self.assertIn("trainer.pre_backward_monitor_probe=true", overrides)
+        self.assertIn("trainer.val_before_train=false", overrides)
+        self.assertIn("trainer.test_freq=-1", overrides)
+        self.assertIn("trainer.save_freq=-1", overrides)
+        self.assertFalse(any("4bit" in item or "8bit" in item or "quant" in item for item in overrides))
+
+        contents = (ROOT / "configs" / "kaggle-t4-monitor.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "unsafe-kaggle.yaml"
+            path.write_text(
+                contents.replace("pre_backward_monitor_probe: true", "pre_backward_monitor_probe: false"),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ConfigError, "must stop before backward"):
+                load_config(path, workspace_root=ROOT)
+
+        with self.assertRaisesRegex(ConfigError, "cannot override max_steps"):
+            config.with_runtime_overrides(max_steps=2)
+        with self.assertRaisesRegex(ConfigError, "does not support checkpoint resume"):
+            config.with_runtime_overrides(resume_from=Path("fake/global_step_1"))
+        with self.assertRaisesRegex(ConfigError, "requires metrics_enabled"):
+            config.with_runtime_overrides(metrics_enabled=False)
 
     def test_three_gpu_profiles_satisfy_full_per_rank_batch_arithmetic(self) -> None:
         expected = {

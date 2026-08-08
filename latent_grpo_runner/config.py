@@ -17,7 +17,7 @@ class ConfigError(ValueError):
     """Raised when a runner profile is unsafe or internally inconsistent."""
 
 
-SUPPORTED_PROFILES = frozenset({"smoke", "3gpu-low", "3gpu-high-smoke"})
+SUPPORTED_PROFILES = frozenset({"smoke", "3gpu-low", "3gpu-high-smoke", "kaggle-t4-monitor"})
 _TOP_LEVEL_KEYS = frozenset(
     {
         "schema_version",
@@ -85,7 +85,9 @@ _NESTED_KEYS = {
             "use_one_sided_gumbel_noise",
         }
     ),
-    "training": frozenset({"max_steps", "seed", "filter_groups_max_num_gen_batches"}),
+    "training": frozenset(
+        {"max_steps", "seed", "filter_groups_max_num_gen_batches", "pre_backward_monitor_probe"}
+    ),
     "paths": frozenset({"upstream_repo_path", "output_root", "cache_root"}),
     "features": frozenset({"metrics_enabled", "support_enabled", "checkpoint_probe_enabled", "credit_probe_enabled"}),
 }
@@ -161,6 +163,7 @@ class TrainingConfig:
     max_steps: int
     seed: int
     filter_groups_max_num_gen_batches: int
+    pre_backward_monitor_probe: bool = False
 
 
 @dataclass(frozen=True)
@@ -290,6 +293,15 @@ class ResolvedConfig:
             values["actor_rollout_ref.rollout.engine_kwargs.sglang.attention_backend"] = (
                 self.rollout.attention_backend
             )
+        if self.training.pre_backward_monitor_probe:
+            # Engineering-only real-intermediate probe.  The vendored actor is
+            # required to stop before backward/optimizer.step; validation and
+            # checkpointing are disabled so this can never masquerade as a train step.
+            values["trainer.pre_backward_monitor_probe"] = True
+            values["trainer.val_before_train"] = False
+            values["trainer.test_freq"] = -1
+            values["trainer.save_freq"] = -1
+            values["trainer.logger"] = "[console]"
         if self.resume_from is not None:
             values["trainer.resume_mode"] = "resume_path"
             values["trainer.resume_from_path"] = self.resume_from
@@ -307,11 +319,23 @@ class ResolvedConfig:
         output_root: Path | None = None,
         max_steps: int | None = None,
         resume_from: Path | None = None,
+        model_path: str | None = None,
+        train_files: str | None = None,
+        val_files: str | None = None,
         support_enabled: bool | None = None,
         metrics_enabled: bool | None = None,
         checkpoint_probe_enabled: bool | None = None,
         credit_probe_enabled: bool | None = None,
     ) -> "ResolvedConfig":
+        if self.training.pre_backward_monitor_probe:
+            if max_steps not in {None, 1}:
+                raise ConfigError("kaggle-t4-monitor cannot override max_steps beyond 1")
+            if resume_from is not None:
+                raise ConfigError("kaggle-t4-monitor does not support checkpoint resume")
+            if metrics_enabled is False:
+                raise ConfigError("kaggle-t4-monitor requires metrics_enabled=true")
+            if support_enabled is True or checkpoint_probe_enabled is True or credit_probe_enabled is True:
+                raise ConfigError("kaggle-t4-monitor forbids extra support/checkpoint/credit probes")
         updated_training = replace(
             self.training,
             seed=self.training.seed if seed is None else seed,
@@ -328,12 +352,23 @@ class ResolvedConfig:
                 self.features.credit_probe_enabled if credit_probe_enabled is None else credit_probe_enabled
             ),
         )
+        updated_model = replace(
+            self.model,
+            path=self.model.path if model_path is None else str(model_path),
+        )
+        updated_data = replace(
+            self.data,
+            train_files=self.data.train_files if train_files is None else str(train_files),
+            val_files=self.data.val_files if val_files is None else str(val_files),
+        )
         updated_paths = dict(self.paths)
         if output_root is not None:
             updated_paths["output_root"] = _resolve_workspace_path(self.workspace_root, str(output_root))
         return replace(
             self,
             training=updated_training,
+            model=updated_model,
+            data=updated_data,
             features=updated_features,
             paths=updated_paths,
             resume_from=(None if resume_from is None else _resolve_workspace_path(self.workspace_root, str(resume_from))),
@@ -450,6 +485,11 @@ def _build_config(raw: Mapping[str, Any], root: Path) -> ResolvedConfig:
                 max_steps=_expect_int(raw["training"], "max_steps"),
                 seed=_expect_int(raw["training"], "seed"),
                 filter_groups_max_num_gen_batches=_expect_int(raw["training"], "filter_groups_max_num_gen_batches"),
+                pre_backward_monitor_probe=(
+                    _expect_bool(raw["training"], "pre_backward_monitor_probe")
+                    if "pre_backward_monitor_probe" in raw["training"]
+                    else False
+                ),
             ),
             paths=paths,
             features=FeatureConfig(
@@ -483,6 +523,44 @@ def _validate_semantics(config: ResolvedConfig) -> None:
         raise ConfigError("3gpu profile requires exactly 3 GPUs")
     if config.profile_name == "smoke" and config.hardware.required_gpus != 1:
         raise ConfigError("smoke profile requires exactly 1 GPU")
+    if config.profile_name == "kaggle-t4-monitor":
+        if config.profile_kind != "monitor_probe":
+            raise ConfigError("kaggle-t4-monitor must use profile_kind=monitor_probe")
+        if config.hardware.required_gpus != 2:
+            raise ConfigError("kaggle-t4-monitor requires exactly 2 GPUs")
+        if not config.training.pre_backward_monitor_probe:
+            raise ConfigError("kaggle-t4-monitor must stop before backward")
+        if config.training.max_steps != 1:
+            raise ConfigError("kaggle-t4-monitor must use max_steps=1")
+        if config.rollout.dtype not in {"float16", "fp16"}:
+            raise ConfigError("kaggle-t4-monitor requires FP16 runtime")
+        if config.model.use_remove_padding:
+            raise ConfigError("kaggle-t4-monitor requires padded SDPA actor path")
+        if config.rollout.attention_backend != "triton":
+            raise ConfigError("kaggle-t4-monitor requires SGLang Triton attention")
+        if not (
+            config.model.enable_gradient_checkpointing
+            and config.model.actor_param_offload
+            and config.model.actor_optimizer_offload
+            and config.model.ref_param_offload
+        ):
+            raise ConfigError("kaggle-t4-monitor requires checkpointing and all configured offloads")
+        if (
+            config.batch.prompt_batch != 1
+            or config.batch.rollout_n != 2
+            or config.batch.mini_prompt_batch != 1
+            or config.batch.actor_micro_batch_per_gpu != 1
+            or config.batch.rollout_log_prob_micro_batch_per_gpu != 1
+            or config.batch.ref_log_prob_micro_batch_per_gpu != 1
+            or config.batch.ppo_epochs != 1
+        ):
+            raise ConfigError("kaggle-t4-monitor requires the fixed minimal monitor batch geometry")
+        if config.data.max_prompt_length > 64 or config.data.max_response_length > 32:
+            raise ConfigError("kaggle-t4-monitor prompt/response limits exceed the monitor budget")
+        if config.rollout.gpu_memory_utilization > 0.30:
+            raise ConfigError("kaggle-t4-monitor SGLang memory utilization must stay <= 0.30")
+    elif config.training.pre_backward_monitor_probe:
+        raise ConfigError("pre_backward_monitor_probe is reserved for kaggle-t4-monitor")
     if not config.paths["upstream_repo_path"].is_dir():
         raise ConfigError("upstream_repo_path does not exist")
     positive_values = (

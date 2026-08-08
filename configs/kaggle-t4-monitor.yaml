@@ -1,0 +1,65 @@
+schema_version: 1
+profile_name: kaggle-t4-monitor
+profile_kind: monitor_probe
+description: Kaggle dual-T4 real-intermediate Latent-GRPO monitor probe; never performs backward or optimizer.step.
+launcher:
+  mode: ray_direct
+target_hardware:
+  required_gpus: 2
+  min_vram_gb: 14
+batch:
+  prompt_batch: 1
+  rollout_n: 2
+  mini_prompt_batch: 1
+  actor_micro_batch_per_gpu: 1
+  rollout_log_prob_micro_batch_per_gpu: 1
+  ref_log_prob_micro_batch_per_gpu: 1
+  ppo_epochs: 1
+model:
+  path: DJCheng/LLaMA3.2-1B-Instruct-Latent-SFT-Top10
+  latent_end_token_id: 524
+  latent_end_token: <|latent_end|>
+  latent_end_source: author_latent_sft_requires_runtime_tokenizer_validation
+  use_remove_padding: false
+  enable_gradient_checkpointing: true
+  actor_param_offload: true
+  actor_optimizer_offload: true
+  ref_param_offload: true
+  use_kl_loss: false
+data:
+  train_files: data/GSM8k-Aug-oss-dup-all.parquet
+  val_files: data/GSM8k-Aug-test.parquet
+  max_prompt_length: 64
+  max_response_length: 32
+rollout:
+  name: sglang
+  dtype: float16
+  attention_backend: triton
+  tensor_parallel_size: 1
+  sequence_parallel_size: 1
+  max_model_len: 96
+  max_num_batched_tokens: 96
+  gpu_memory_utilization: 0.25
+  max_topk: 10
+  temperature: 0.6
+  top_p: 0.95
+  top_k: 30
+  gumbel_softmax_temperature: 1.0
+  noise_scale: 1.0
+  enable_latent: true
+  add_noise_gumbel_softmax: true
+  use_one_sided_gumbel_noise: true
+training:
+  max_steps: 1
+  seed: 17
+  filter_groups_max_num_gen_batches: 5
+  pre_backward_monitor_probe: true
+paths:
+  upstream_repo_path: Latent-GRPO
+  output_root: artifacts/runs/kaggle-t4-monitor
+  cache_root: cache
+features:
+  metrics_enabled: true
+  support_enabled: false
+  checkpoint_probe_enabled: false
+  credit_probe_enabled: false

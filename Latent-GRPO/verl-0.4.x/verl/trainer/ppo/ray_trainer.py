@@ -1070,6 +1070,9 @@ class RayPPOTrainer:
         )
 
         self.global_steps = 0
+        pre_backward_monitor_probe = bool(
+            self.config.trainer.get("pre_backward_monitor_probe", False)
+        )
 
         # load checkpoint before doing anything
         self._load_checkpoint()
@@ -1080,6 +1083,11 @@ class RayPPOTrainer:
             start_run(
                 resume_checkpoint_step=(self.global_steps if self.global_steps > 0 else None)
             )
+        if pre_backward_monitor_probe and not (
+            self._latent_grpo_observer is not None
+            and self._latent_grpo_observer.enabled
+        ):
+            raise RuntimeError("pre-backward monitor probe requires metrics_enabled=true")
 
         # perform validation before training
         # currently, we only support validation using the reward_function.
@@ -1439,6 +1447,7 @@ class RayPPOTrainer:
                             batch.meta_info["exclude_overlong_samples_from_advantage"] = exclude_overlong_samples_from_advantage
                             batch.meta_info['add_noise_dirichlet'] = self.config.actor_rollout_ref.rollout.add_noise_dirichlet
                             batch.meta_info['add_noise_gumbel_softmax'] = self.config.actor_rollout_ref.rollout.add_noise_gumbel_softmax
+                            batch.meta_info["pre_backward_monitor_probe"] = pre_backward_monitor_probe
                             actor_output = self.actor_rollout_wg.update_actor(batch)
                         worker_observer_packets = actor_output.meta_info.pop(
                             "latent_grpo_worker_observers", []
@@ -1471,7 +1480,11 @@ class RayPPOTrainer:
                             actor_update_event.update(
                                 {
                                     "global_step": int(self.global_steps),
-                                    "observation_phase": "post_update",
+                                    "observation_phase": (
+                                        "pre_backward_probe"
+                                        if pre_backward_monitor_probe
+                                        else "post_update"
+                                    ),
                                 }
                             )
                         actor_output_metrics = reduce_metrics(actor_output.meta_info["metrics"])
@@ -1480,15 +1493,23 @@ class RayPPOTrainer:
                             assert actor_update_event is not None and step_started_at is not None
                             actor_update_event.update(
                                 {
-                                    "driver_step_time_seconds": max(
-                                        0.0,
-                                        time.perf_counter() - step_started_at - p1_driver_compute_time,
+                                    "driver_step_time_seconds": (
+                                        None
+                                        if pre_backward_monitor_probe
+                                        else max(
+                                            0.0,
+                                            time.perf_counter() - step_started_at - p1_driver_compute_time,
+                                        )
                                     ),
                                     "metrics_compute_time": p1_driver_compute_time,
                                     "learning_rate": metrics.get("actor/lr"),
                                 }
                             )
-                            self._latent_grpo_observer.emit("actor_update", actor_update_event)
+                            if pre_backward_monitor_probe:
+                                self._latent_grpo_observer.emit("pre_backward_probe", actor_update_event)
+                            else:
+                                # Preserve the production P1 source contract exactly.
+                                self._latent_grpo_observer.emit("actor_update", actor_update_event)
 
                     # Log rollout generations if enabled
                     rollout_data_dir = self.config.trainer.get("rollout_data_dir", None)
@@ -1506,14 +1527,14 @@ class RayPPOTrainer:
                             )
 
                     # validate
-                    if self.val_reward_fn is not None and self.config.trainer.test_freq > 0 and (is_last_step or self.global_steps % self.config.trainer.test_freq == 0):
+                    if not pre_backward_monitor_probe and self.val_reward_fn is not None and self.config.trainer.test_freq > 0 and (is_last_step or self.global_steps % self.config.trainer.test_freq == 0):
                         with _timer("testing", timing_raw):
                             val_metrics: dict = self._validate()
                             if is_last_step:
                                 last_val_metrics = val_metrics
                         metrics.update(val_metrics)
 
-                    if self.config.trainer.save_freq > 0 and (is_last_step or self.global_steps % self.config.trainer.save_freq == 0):
+                    if not pre_backward_monitor_probe and self.config.trainer.save_freq > 0 and (is_last_step or self.global_steps % self.config.trainer.save_freq == 0):
                         with _timer("save_checkpoint", timing_raw):
                             self._save_checkpoint()
 
@@ -1536,6 +1557,16 @@ class RayPPOTrainer:
 
                 progress_bar.update(1)
                 self.global_steps += 1
+                if pre_backward_monitor_probe:
+                    pprint(
+                        {
+                            "status": "REAL_PRE_BACKWARD_MONITOR_PROBE_PASS",
+                            "optimizer_step_performed": False,
+                            "completed_global_step": self.global_steps - 1,
+                        }
+                    )
+                    progress_bar.close()
+                    return
                 if is_last_step:
                     pprint(f"Final validation metrics: {last_val_metrics}")
                     progress_bar.close()

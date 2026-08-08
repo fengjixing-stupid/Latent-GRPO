@@ -753,6 +753,11 @@ class DataParallelPPOActor(BasePPOActor):
         self.last_update_did_step = False
         self.last_update_count = 0
         update_count = 0
+        pre_backward_monitor_probe = bool(
+            data.meta_info.get("pre_backward_monitor_probe", False)
+        )
+        if pre_backward_monitor_probe and not self._latent_grpo_observer_enabled:
+            raise RuntimeError("pre-backward monitor probe requires the durable observer")
 
         temperature = data.meta_info["temperature"]  # temperature must be in the data.meta_info to avoid silent error
         top_p = data.meta_info["top_p"]
@@ -900,15 +905,30 @@ class DataParallelPPOActor(BasePPOActor):
                         loss = policy_loss * (len(data) / self.config.ppo_mini_batch_size)
                     else:
                         loss = policy_loss / self.gradient_accumulation
-                    loss.backward()
 
-                    data = {
+                    metric_row = {
                         "actor/pg_loss": pg_loss.detach().item(),
                         "actor/pg_clipfrac": pg_clipfrac.detach().item() if hasattr(pg_clipfrac, 'item') else pg_clipfrac,
                         "actor/ppo_kl": ppo_kl.detach().item() if hasattr(ppo_kl, 'item') else ppo_kl,
                         "actor/pg_clipfrac_lower": pg_clipfrac_lower.detach().item() if hasattr(pg_clipfrac_lower, 'item') else pg_clipfrac_lower,
                     }
-                    append_to_dict(metrics, data)
+                    append_to_dict(metrics, metric_row)
+
+                    if pre_backward_monitor_probe:
+                        # The real actor forward, Gumbel/FlipGrad gating, PPO loss,
+                        # and observer reductions have all run.  Stop here so the
+                        # Kaggle engineering probe cannot allocate gradients or
+                        # mutate model/optimizer state.
+                        append_to_dict(metrics, {
+                            "monitor_probe/pre_backward_reached": 1.0,
+                            "monitor_probe/optimizer_step_skipped": 1.0,
+                        })
+                        self.actor_optimizer.zero_grad()
+                        self.last_update_count = 0
+                        self.last_update_did_step = False
+                        return metrics
+
+                    loss.backward()
 
                 grad_norm = self._optimizer_step()
                 did_update = self._last_optimizer_did_step
