@@ -56,7 +56,7 @@ class LauncherTests(unittest.TestCase):
         self.assertEqual(kwargs["env"]["LATENT_GRPO_OBSERVER_PROFILE_NAME"], "smoke")
         self.assertEqual(kwargs["env"]["LATENT_GRPO_OBSERVER_SEED"], "17")
         self.assertEqual(kwargs["env"]["LATENT_GRPO_OBSERVER_CONFIG_HASH"], config.resume_compatibility_hash)
-        self.assertEqual(build_launcher_plan(config).metrics_sink_status, "driver_append_only_p0_ready")
+        self.assertEqual(build_launcher_plan(config).metrics_sink_status, "driver_append_only_p1_ready")
 
     def test_default_launcher_is_single_ray_direct_driver(self) -> None:
         config = load_config(ROOT / "configs" / "3gpu-low.yaml", workspace_root=ROOT)

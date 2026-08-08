@@ -61,7 +61,7 @@ def build_launcher_plan(config: ResolvedConfig) -> LauncherPlan:
         control_rank_only=config.launcher.mode == "torchrun_control",
         metrics_enabled=config.features.metrics_enabled,
         metrics_sink_status=(
-            "driver_append_only_p0_ready" if config.features.metrics_enabled else "disabled"
+            "driver_append_only_p1_ready" if config.features.metrics_enabled else "disabled"
         ),
     )
 
