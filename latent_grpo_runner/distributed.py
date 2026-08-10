@@ -83,6 +83,14 @@ def launch(
     runtime_environment["LATENT_GRPO_SUPPORT_ENABLED"] = "1" if config.features.support_enabled else "0"
     runtime_environment["LATENT_GRPO_CHECKPOINT_PROBE_ENABLED"] = "1" if config.features.checkpoint_probe_enabled else "0"
     runtime_environment["LATENT_GRPO_CREDIT_PROBE_ENABLED"] = "1" if config.features.credit_probe_enabled else "0"
+    if config.profile_name == "kaggle-t4-30-metric":
+        allocator_options = [
+            option
+            for option in runtime_environment.get("PYTORCH_CUDA_ALLOC_CONF", "").split(",")
+            if option and not option.startswith("expandable_segments:")
+        ]
+        allocator_options.append("expandable_segments:True")
+        runtime_environment["PYTORCH_CUDA_ALLOC_CONF"] = ",".join(allocator_options)
     if config.features.metrics_enabled:
         workspace_root = str(Path(__file__).resolve().parents[1])
         existing_pythonpath = runtime_environment.get("PYTHONPATH", "")

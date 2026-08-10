@@ -223,7 +223,13 @@ class DataParallelPPOActor(BasePPOActor):
             """Look up embeddings safely when the module is wrapped by FSDP."""
             embed = fsdp_wrapped_module.get_input_embeddings()
 
-            ctx = FSDP.summon_full_params(fsdp_wrapped_module, writeback=False, with_grads=False)
+            get_torch_device().empty_cache()
+            ctx = FSDP.summon_full_params(
+                fsdp_wrapped_module,
+                recurse=False,
+                writeback=False,
+                with_grads=False,
+            )
             with ctx:
                 w = embed.weight
                 _input_ids = input_ids.to(w.device).clone()
@@ -231,7 +237,7 @@ class DataParallelPPOActor(BasePPOActor):
                 if mask.any():
                     _input_ids[mask] = 0
                 
-                embs = embed(_input_ids)
+                embs = embed(_input_ids).detach()
                 
                 if mask.any():
                     embs[mask] = 0
@@ -289,34 +295,21 @@ class DataParallelPPOActor(BasePPOActor):
                     topk_ids_rmpad, topk_gumbels_rmpad, gumbel_temperature
                 )
                 
-                # Step 1: Always lookup the first candidate (this is the only candidate for hard tokens)
-                # We use safe_lookup_embeddings which now handles -100 safely.
-                # However, for the first candidate, it shouldn't be -100 anyway.
-                all_first_embs = safe_lookup_embeddings(
+                has_soft_tokens = (~hard_token_mask).any()
+                lookup_ids = topk_ids_rmpad if has_soft_tokens else topk_ids_rmpad[:, :1]
+                lookup_embs = safe_lookup_embeddings(
                     self.actor_module,
-                    topk_ids_rmpad[:, :1],
+                    lookup_ids,
                     target_device=topk_gumbels_rmpad.device,
-                    target_dtype=topk_gumbels_rmpad.dtype
-                ).squeeze(1) # (total_nnz, dim)
-                # Step 2: Handle soft tokens
-                if (~hard_token_mask).any():
+                    target_dtype=topk_gumbels_rmpad.dtype,
+                )
+                all_first_embs = lookup_embs[:, 0, :]
+                if has_soft_tokens:
                     # Soft tokens need all K candidates
-                    # We compute the weighted sum only for indices where they are soft tokens
-                    # But for simplicity and batching, we can still compute it for all, 
-                    # as long as we use the correct mask for the gumbel noise.
                     mask_expanded = hard_token_mask.unsqueeze(-1) # (total_nnz, 1)
-                    
-                    # Gumbel weights were produced by the shared exact mixture helper.
-                    # Full lookup (only if there are soft tokens)
-                    topk_embs = safe_lookup_embeddings(
-                        self.actor_module,
-                        topk_ids_rmpad,
-                        target_device=topk_gumbels_rmpad.device,
-                        target_dtype=topk_gumbels_rmpad.dtype
-                    ) # (total_nnz, K, dim)
-                    
-                    soft_embs = torch.sum(gumbel_y.unsqueeze(-1).float() * topk_embs.float(), dim=1).to(self.runtime_dtype) # (total_nnz, dim)
-                    
+                    soft_embs = torch.sum(
+                        gumbel_y.unsqueeze(-1).float() * lookup_embs.float(), dim=1
+                    ).to(self.runtime_dtype)
                     # Output is hard_embs for hard tokens, soft_embs for soft tokens
                     topk_embs_final = torch.where(mask_expanded, all_first_embs, soft_embs)
                 else:
@@ -561,18 +554,13 @@ class DataParallelPPOActor(BasePPOActor):
                     rollout_topk_ids, rollout_topk_gumbels, gumbel_temperature
                 )
                 mask_expanded = hard_token_mask.unsqueeze(-1)
-                all_first_embs = safe_lookup_embeddings(
-                    self.actor_module,
-                    rollout_topk_ids[..., :1],
-                    target_device=rollout_topk_gumbels.device,
-                    target_dtype=rollout_topk_gumbels.dtype,
-                ).squeeze(-2)
                 topk_embs_all = safe_lookup_embeddings(
                     self.actor_module,
                     rollout_topk_ids,
                     target_device=rollout_topk_gumbels.device,
                     target_dtype=rollout_topk_gumbels.dtype,
                 )
+                all_first_embs = topk_embs_all[..., 0, :]
                 soft_embs = torch.sum(
                     gumbel_y.unsqueeze(-1).float() * topk_embs_all.float(), dim=-2
                 ).to(self.runtime_dtype)

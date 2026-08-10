@@ -196,6 +196,31 @@ class T4RuntimeSemanticTests(unittest.TestCase):
         self.assertIn("valid_mask=response_mask", source)
         self.assertIn("component_log_probs = full_current_topk_logits.detach().float()", source)
 
+    def test_embedding_lookup_bounds_fsdp_unshard_and_uses_one_padded_lookup(self):
+        source = ACTOR.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        lookup = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "safe_lookup_embeddings"
+        )
+        lookup_source = ast.get_source_segment(source, lookup)
+        forward = next(
+            node
+            for node in ast.walk(tree)
+            if isinstance(node, ast.FunctionDef) and node.name == "_forward_micro_batch"
+        )
+        forward_source = ast.get_source_segment(source, forward)
+        padded_source = forward_source.split(
+            "padded latent path: same Top-K/Gumbel semantics", 1
+        )[1]
+
+        self.assertIn("recurse=False", lookup_source)
+        self.assertIn("get_torch_device().empty_cache()", lookup_source)
+        self.assertIn("embs = embed(_input_ids).detach()", lookup_source)
+        self.assertEqual(padded_source.count("safe_lookup_embeddings("), 1)
+        self.assertIn("all_first_embs = topk_embs_all[..., 0, :]", padded_source)
+
     def test_t4_changes_attention_not_sampling_backend(self):
         config_source = CONFIG.read_text(encoding="utf-8")
         fsdp = FSDP.read_text(encoding="utf-8")
