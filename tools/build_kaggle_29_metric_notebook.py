@@ -337,7 +337,7 @@ if GATES.get("GIT_IDENTITY_GATE", {}).get("status") == "PASS":
 
     formal_stage4_sources = []
     formal_runner = REPO_DIR / FORMAL_RUNTIME_RUNNER
-    runtime_sources = "\n".join(
+    runtime_sources = "\\n".join(
         path.read_text(encoding="utf-8", errors="replace")
         for path in (
             formal_runner,
