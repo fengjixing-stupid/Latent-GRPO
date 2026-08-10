@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
+from types import SimpleNamespace
 import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 CONFIG = ROOT / "latent_grpo_runner/config.py"
 ACTOR = ROOT / "Latent-GRPO/verl-0.4.x/verl/workers/actor/dp_actor.py"
 TORCH_FUNCTIONAL = ROOT / "Latent-GRPO/verl-0.4.x/verl/utils/torch_functional.py"
+CORE_ALGOS = ROOT / "Latent-GRPO/verl-0.4.x/verl/trainer/ppo/core_algos.py"
 FSDP = ROOT / "Latent-GRPO/verl-0.4.x/verl/workers/fsdp_workers.py"
 SGLANG_ROLLOUT = ROOT / "Latent-GRPO/verl-0.4.x/verl/workers/rollout/sglang_rollout/sglang_rollout.py"
 SGLANG_SAMPLER = ROOT / "Latent-GRPO/sglang_latent_reasoning_pkg/python/sglang/srt/layers/sampler.py"
@@ -75,6 +77,114 @@ class T4RuntimeSemanticTests(unittest.TestCase):
         self.assertTrue(torch.allclose(standard.detach(), flipped.detach(), atol=0, rtol=0))
         self.assertFalse(torch.allclose(grad_standard, flipped_logits.grad))
 
+    def test_gumbel_logprob_excludes_masked_nan_inf_before_nonlinear_math(self):
+        torch = self.torch
+        fn = _extract_function(
+            TORCH_FUNCTIONAL,
+            "logprobs_from_logits_topk_gumbel",
+            {"torch": torch, "F": self.F},
+        )
+        logits = torch.tensor(
+            [[2.0, 1.0, 0.0], [float("nan"), float("inf"), -float("inf")]],
+            requires_grad=True,
+        )
+        ids = torch.tensor([[0, 1], [-100, -100]])
+        gumbels = torch.tensor([[0.2, -0.1], [float("nan"), float("inf")]])
+        labels = torch.tensor([0, 0])
+        valid_mask = torch.tensor([True, False])
+        baseline_logits = logits[:1].detach().clone().requires_grad_(True)
+        baseline = fn(
+            baseline_logits,
+            ids[:1],
+            gumbels[:1],
+            labels[:1],
+            1.0,
+            1.0,
+            advantages=torch.tensor([1.0]),
+        )
+        baseline.sum().backward()
+
+        output = fn(
+            logits,
+            ids,
+            gumbels,
+            labels,
+            1.0,
+            1.0,
+            advantages=torch.tensor([1.0, float("nan")]),
+            valid_mask=valid_mask,
+        )
+
+        self.assertTrue(torch.isfinite(output).all())
+        self.assertTrue(torch.equal(output[:1], baseline.detach()))
+        self.assertEqual(output[1].item(), 0.0)
+        output.sum().backward()
+        self.assertTrue(torch.isfinite(logits.grad).all())
+        self.assertTrue(torch.equal(logits.grad[:1], baseline_logits.grad))
+        self.assertTrue(torch.equal(logits.grad[1], torch.zeros_like(logits.grad[1])))
+
+    def test_ppo_excludes_masked_nan_inf_before_ratio_and_loss(self):
+        torch = self.torch
+        masked_mean = _extract_function(
+            TORCH_FUNCTIONAL,
+            "masked_mean",
+            {"torch": torch},
+        )
+        verl_f = SimpleNamespace(masked_mean=masked_mean)
+        agg_loss = _extract_function(
+            CORE_ALGOS,
+            "agg_loss",
+            {"torch": torch, "verl_F": verl_f},
+        )
+        compute_policy_loss = _extract_function(
+            CORE_ALGOS,
+            "compute_policy_loss",
+            {"torch": torch, "verl_F": verl_f, "agg_loss": agg_loss},
+        )
+        old_log_prob = torch.tensor([[-1.0, -2.0, -float("inf"), float("nan")]])
+        log_prob = torch.tensor(
+            [[-0.9, -2.1, -float("inf"), float("inf")]],
+            requires_grad=True,
+        )
+        advantages = torch.tensor([[1.0, -0.5, float("nan"), float("inf")]])
+        response_mask = torch.tensor([[1, 1, 0, 0]], dtype=torch.bool)
+
+        pg_loss, _, ppo_kl, _ = compute_policy_loss(
+            old_log_prob=old_log_prob,
+            log_prob=log_prob,
+            advantages=advantages,
+            response_mask=response_mask,
+            cliprange=0.2,
+        )
+
+        self.assertTrue(torch.isfinite(pg_loss))
+        self.assertTrue(torch.isfinite(ppo_kl))
+        pg_loss.backward()
+        self.assertTrue(torch.isfinite(log_prob.grad).all())
+        self.assertTrue(
+            torch.equal(log_prob.grad[~response_mask], torch.zeros_like(log_prob.grad[~response_mask]))
+        )
+
+    def test_masked_mean_excludes_nonfinite_values_and_gradients(self):
+        torch = self.torch
+        masked_mean = _extract_function(
+            TORCH_FUNCTIONAL,
+            "masked_mean",
+            {"torch": torch},
+        )
+        values = torch.tensor(
+            [2.0, float("nan"), float("inf"), -float("inf")],
+            requires_grad=True,
+        )
+        mask = torch.tensor([1, 0, 0, 0], dtype=torch.bool)
+
+        result = masked_mean(values, mask)
+
+        self.assertEqual(result.item(), 2.0)
+        result.backward()
+        self.assertTrue(torch.isfinite(values.grad).all())
+        self.assertTrue(torch.equal(values.grad[1:], torch.zeros_like(values.grad[1:])))
+
     def test_padded_actor_reuses_same_latent_and_flipgrad_inputs(self):
         source = ACTOR.read_text(encoding="utf-8")
         self.assertIn("_latent_mixture_weights", source)
@@ -83,6 +193,7 @@ class T4RuntimeSemanticTests(unittest.TestCase):
         self.assertIn("next_topk_ids = rollout_topk_ids[:, -response_length:, :]", source)
         self.assertIn("next_topk_gumbels = rollout_topk_gumbels[:, -response_length:, :]", source)
         self.assertIn("advantages=advantages", source)
+        self.assertIn("valid_mask=response_mask", source)
         self.assertIn("component_log_probs = full_current_topk_logits.detach().float()", source)
 
     def test_t4_changes_attention_not_sampling_backend(self):

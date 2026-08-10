@@ -140,6 +140,7 @@ def logprobs_from_logits_topk_gumbel(
     inplace_backward=True,
     advantages=None,
     return_probe_tensors=False,
+    valid_mask=None,
 ):
     """Latent Gumbel likelihood and FlipGrad proxy using native PyTorch math.
 
@@ -156,11 +157,27 @@ def logprobs_from_logits_topk_gumbel(
     rollout_topk_ids = rollout_topk_ids.reshape(-1, k_num)
     rollout_topk_gumbels = rollout_topk_gumbels.reshape(-1, k_num)
 
-    logits_f32 = logits.float()
-    rollout_topk_gumbels_f32 = rollout_topk_gumbels.float()
+    if valid_mask is None:
+        valid_flat = torch.ones_like(labels, dtype=torch.bool)
+    else:
+        valid_flat = valid_mask.reshape(-1).to(device=logits.device, dtype=torch.bool)
+        if valid_flat.numel() != labels.numel():
+            raise ValueError("valid_mask must match the log-probability batch dimensions")
+    valid_rows = valid_flat.unsqueeze(-1)
+
+    logits_f32 = torch.where(valid_rows, logits.float(), torch.zeros_like(logits, dtype=torch.float32))
+    rollout_topk_gumbels_f32 = torch.where(
+        valid_rows,
+        rollout_topk_gumbels.float(),
+        torch.zeros_like(rollout_topk_gumbels, dtype=torch.float32),
+    )
 
     rollout_topk_ids_safe = rollout_topk_ids.clone()
     rollout_topk_ids_safe[rollout_topk_ids_safe == -100] = 0
+    rollout_topk_ids_safe = torch.where(
+        valid_rows, rollout_topk_ids_safe, torch.zeros_like(rollout_topk_ids_safe)
+    )
+    labels_safe = torch.where(valid_flat, labels, torch.zeros_like(labels))
 
     # Use global log-softmax to match SGLang's log-probability calculation.
     full_log_probs = logits_f32.log_softmax(dim=-1)
@@ -174,8 +191,14 @@ def logprobs_from_logits_topk_gumbel(
 
     need_flip_mask = torch.zeros_like(raw_diff, dtype=torch.bool)
     if advantages is not None:
-        adv_expanded = advantages.reshape(*batch_dim, 1).expand_as(raw_diff)
-        need_flip_mask = (adv_expanded <= 0) & (raw_diff < 0)
+        advantages_flat = advantages.reshape(-1).to(device=logits.device)
+        if advantages_flat.numel() != labels.numel():
+            raise ValueError("advantages must match the log-probability batch dimensions")
+        advantages_flat = torch.where(
+            valid_flat, advantages_flat, torch.zeros_like(advantages_flat)
+        )
+        adv_expanded = advantages_flat.reshape(*batch_dim, 1).expand_as(raw_diff)
+        need_flip_mask = (adv_expanded <= 0) & (raw_diff < 0) & valid_rows.reshape(*batch_dim, 1)
         raw_diff_flipped = -raw_diff
         output_gumbel_flipped = -raw_diff_flipped - (-raw_diff_flipped).exp()
         need_flip_float = need_flip_mask.float()
@@ -194,9 +217,10 @@ def logprobs_from_logits_topk_gumbel(
     batch_temps[is_standard_token] = temperature
     logits_scaled_f32 = logits_f32 / batch_temps
     full_logprobs = F.log_softmax(logits_scaled_f32, dim=-1)
-    output_answer = full_logprobs.gather(-1, labels.unsqueeze(-1)).squeeze(-1)
+    output_answer = full_logprobs.gather(-1, labels_safe.unsqueeze(-1)).squeeze(-1)
 
-    output = torch.where(is_standard_token, output_answer, output_gumbel).view(*batch_dim)
+    output = torch.where(is_standard_token, output_answer, output_gumbel)
+    output = torch.where(valid_flat, output, torch.zeros_like(output)).view(*batch_dim)
     if not return_probe_tensors:
         return output
     return output, {
@@ -301,7 +325,8 @@ def masked_mean(values, mask, axis=None):
     Returns:
         Tensor: Masked mean, with shape equal to `values` reduced over `axis`.
     """
-    return (values * mask).sum(axis=axis) / (mask.sum(axis=axis) + 1e-8)
+    safe_values = torch.where(mask != 0, values, torch.zeros_like(values))
+    return (safe_values * mask).sum(axis=axis) / (mask.sum(axis=axis) + 1e-8)
 
 
 def masked_var(values, mask, unbiased=True):

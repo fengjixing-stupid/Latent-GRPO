@@ -259,6 +259,7 @@ class DataParallelPPOActor(BasePPOActor):
             batch_size, seqlen = input_ids.shape
             k_num = rollout_topk_gumbels.size(-1)
             attention_mask = micro_batch["attention_mask"]
+            response_mask = attention_mask[:, -response_length:].bool()
             position_ids = micro_batch["position_ids"]
             gumbel_temperature = micro_batch["gumbel_temperature"][0].item()
             entropy = None
@@ -601,6 +602,7 @@ class DataParallelPPOActor(BasePPOActor):
                         inplace_backward=not calculate_entropy,
                         advantages=advantages,
                         return_probe_tensors=collect_checkpoint_probe,
+                        valid_mask=response_mask,
                     )
                     if collect_checkpoint_probe:
                         log_probs, checkpoint_probe_tensors = log_prob_result

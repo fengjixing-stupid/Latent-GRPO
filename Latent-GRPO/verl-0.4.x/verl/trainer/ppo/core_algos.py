@@ -818,25 +818,34 @@ def compute_policy_loss(
     """
     assert clip_ratio_c > 1.0, "The lower bound of the clip_ratio_c for dual-clip PPO should be greater than 1.0," + f" but get the value: {clip_ratio_c}."
 
-    negative_approx_kl = log_prob - old_log_prob
+    valid_response = response_mask.bool()
+    safe_log_prob = torch.where(valid_response, log_prob, torch.zeros_like(log_prob))
+    safe_old_log_prob = torch.where(
+        valid_response, old_log_prob, torch.zeros_like(old_log_prob)
+    )
+    safe_advantages = torch.where(
+        valid_response, advantages, torch.zeros_like(advantages)
+    )
+
+    negative_approx_kl = safe_log_prob - safe_old_log_prob
     ratio = torch.exp(negative_approx_kl)
     ppo_kl = verl_F.masked_mean(-negative_approx_kl, response_mask)
 
-    pg_losses1 = -advantages * ratio
+    pg_losses1 = -safe_advantages * ratio
     if cliprange_low is None:
         cliprange_low = cliprange
     if cliprange_high is None:
         cliprange_high = cliprange
-    pg_losses2 = -advantages * torch.clamp(ratio, 1 - cliprange_low, 1 + cliprange_high)  # - clip(ratio, 1-cliprange, 1+cliprange) * A
+    pg_losses2 = -safe_advantages * torch.clamp(ratio, 1 - cliprange_low, 1 + cliprange_high)  # - clip(ratio, 1-cliprange, 1+cliprange) * A
     clip_pg_losses1 = torch.maximum(pg_losses1, pg_losses2)  # max(-ratio * A, -clip(ratio, 1-cliprange, 1+cliprange) * A)
     clip_mask = torch.gt(pg_losses2, pg_losses1)
     pg_clipfrac = verl_F.masked_mean(clip_mask.float(), response_mask)
 
-    pg_losses3 = -advantages * clip_ratio_c
+    pg_losses3 = -safe_advantages * clip_ratio_c
     clip_pg_losses2 = torch.min(pg_losses3, clip_pg_losses1)
-    pg_clipfrac_lower = verl_F.masked_mean(torch.gt(clip_pg_losses1, pg_losses3) * (advantages < 0).float(), response_mask)
+    pg_clipfrac_lower = verl_F.masked_mean(torch.gt(clip_pg_losses1, pg_losses3) * (safe_advantages < 0).float(), response_mask)
 
-    pg_losses = torch.where(advantages < 0, clip_pg_losses2 * neg_adv_weight, clip_pg_losses1)
+    pg_losses = torch.where(safe_advantages < 0, clip_pg_losses2 * neg_adv_weight, clip_pg_losses1)
     pg_loss = agg_loss(loss_mat=pg_losses, loss_mask=response_mask, loss_agg_mode=loss_agg_mode)
 
     if return_observer_tensors:
