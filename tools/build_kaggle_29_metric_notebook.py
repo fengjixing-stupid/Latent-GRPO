@@ -56,8 +56,8 @@ STATE_PRESERVATION_REPORT = OUTPUT_ROOT / "stage4_state_preservation.json"
 STAGE123_NON_POLLUTION_REPORT = OUTPUT_ROOT / "stage123_non_pollution.json"
 
 MODEL_PATH = Path("/kaggle/input/models/fengjixing/llama3-2-1b-instruct-latent-sft-top10/pytorch/latent-sft/1/LLaMA3.2-1B-Instruct-Latent-SFT-Top10")
-TRAIN_PATH = Path("/kaggle/input/datasets/fengjixing/latent-rl-data/data/GSM8k-Aug-oss-dup-all.parquet")
-VAL_PATH = Path("/kaggle/input/datasets/fengjixing/latent-rl-data/data/GSM8k-Aug-test.parquet")
+TRAIN_PATH = Path("/kaggle/input/datasets/fengjixing/rl-data-latent-grpo/data/GSM8k-Aug-oss-dup-all.parquet")
+VAL_PATH = Path("/kaggle/input/datasets/fengjixing/rl-data-latent-grpo/data/GSM8k-Aug-test.parquet")
 EXPECTED_TRAIN_SHA256 = "3766e3a83cd82ddd686392d8bc6ef6f262821490a09b694b2caed44f1a482501"
 EXPECTED_VAL_SHA256 = "fd36cfb91155f2fd3b53ae3b0377543b9f92dfec20ada81835b4e39902689add"
 

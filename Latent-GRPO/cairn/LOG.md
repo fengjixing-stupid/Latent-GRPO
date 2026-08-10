@@ -2,6 +2,11 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-11 · 修正 Kaggle 数据集挂载路径
+
+- 已运行 notebook 的首个阻塞为用户新增 `cp` 单元缺少递归参数，导致 `/kaggle/working/data` 中不存在 train/validation parquet，训练未启动并按设计输出 0/29。
+- 正式 notebook 现直接读取 Kaggle Input `fengjixing/rl-data-latent-grpo/data`，不复制数据、不占 working disk，并继续校验两份 parquet 的固定 SHA256 和 schema。
+
 ## 2026-08-11 · Kaggle 指标验证使用轻量 checkpoint
 
 - Kaggle 实证 FSDP `actor_rollout_save_checkpoint` 因同时构造 model/optimizer CPU state dict 触发 Ray `NODE_OUT_OF_MEMORY`；磁盘仍余 12 GB，输出目录仅 360 KB。

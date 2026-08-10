@@ -76,6 +76,12 @@ class Kaggle30MetricNotebookTests(unittest.TestCase):
         for flag in ("--model-path", "--train-path", "--val-path", "--output-root"):
             self.assertIn(flag, self.code)
 
+    def test_notebook_reads_the_mounted_dataset_without_copying_to_working(self) -> None:
+        dataset_root = "/kaggle/input/datasets/fengjixing/rl-data-latent-grpo/data"
+        self.assertIn(f"{dataset_root}/GSM8k-Aug-oss-dup-all.parquet", self.code)
+        self.assertIn(f"{dataset_root}/GSM8k-Aug-test.parquet", self.code)
+        self.assertNotIn('/kaggle/working/data/', self.code)
+
     def test_notebook_fails_closed_over_runtime_and_non_pollution_evidence(self) -> None:
         for gate in (
             "GIT_IDENTITY_GATE",
