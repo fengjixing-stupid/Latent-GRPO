@@ -69,6 +69,17 @@ def collect_support_metrics(
         )
         if len(rollout) != len(clean) or len(rollout) != len(mask):
             raise ValueError("batch_size_mismatch")
+        response_widths = {len(row) for row in mask}
+        if len(response_widths) != 1:
+            raise ValueError("response_width_mismatch")
+        response_width = next(iter(response_widths))
+        if response_width < 1 or any(
+            len(rollout_row) < response_width or len(clean_row) < response_width
+            for rollout_row, clean_row in zip(rollout, clean)
+        ):
+            raise ValueError("response_width_mismatch")
+        rollout = [row[-response_width:] for row in rollout]
+        clean = [row[-response_width:] for row in clean]
         if any(len(rollout_row) != len(clean_row) or len(rollout_row) != len(mask_row)
                for rollout_row, clean_row, mask_row in zip(rollout, clean, mask)):
             raise ValueError("response_width_mismatch")

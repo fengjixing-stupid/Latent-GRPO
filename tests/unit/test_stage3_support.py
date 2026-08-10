@@ -97,6 +97,29 @@ class Stage3SupportTests(unittest.TestCase):
         self.assertEqual(rows[0]["support/retention_rate"], 1.0)
         self.assertEqual(benchmark["support_candidate_trajectory_count"], 1)
 
+    def test_support_dynamically_aligns_full_sequence_topk_to_response_width(self) -> None:
+        from latent_grpo_runner.metrics.support import collect_support_metrics
+
+        rows, benchmark = collect_support_metrics(
+            profile_name="smoke",
+            seed=7,
+            global_step=3,
+            optimizer_step_at_observation=5,
+            group_ids=["g"],
+            trajectory_ids=[0],
+            trajectory_classes=["correct"],
+            trajectory_mean_old_log_probs=[-0.1],
+            response_mask=[[True, True]],
+            rollout_topk_ids=[[[90, -100], [91, -100], [1, 2], [3, 4]]],
+            old_topk_indices=[[[80, 81], [82, 83], [84, 85], [2, 1], [4, 3]]],
+        )
+
+        self.assertTrue(benchmark["support_available"])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["support/effective_position_count"], 2)
+        self.assertEqual(rows[0]["support/retention_rate"], 1.0)
+        self.assertEqual(rows[0]["support/top1_retention_rate"], 1.0)
+
     def test_support_fail_closed_for_shape_k_and_order_mismatch(self) -> None:
         from latent_grpo_runner.metrics.support import collect_support_metrics
 
@@ -113,10 +136,12 @@ class Stage3SupportTests(unittest.TestCase):
         )
         for bad in (
             {"rollout_topk_ids": [[[1, 2]]], "old_topk_indices": [[[1, 2, 3]]]},
-            {"rollout_topk_ids": [[[1, 2], [3, 4]]], "old_topk_indices": [[[1, 2], [3, 4]]]},
+            {"rollout_topk_ids": [[[1, 2]]], "old_topk_indices": [[[1, 2]]], "response_mask": [[True, True]]},
             {"rollout_topk_ids": [[[1, 2]]], "old_topk_indices": [[[1, -100]]]},
         ):
-            rows, benchmark = collect_support_metrics(**base, **bad)
+            case = dict(base)
+            case.update(bad)
+            rows, benchmark = collect_support_metrics(**case)
             self.assertEqual(rows, [])
             self.assertFalse(benchmark["support_available"])
             self.assertIsNotNone(benchmark["support_unavailable_reason"])
