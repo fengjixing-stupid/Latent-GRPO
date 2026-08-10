@@ -2,6 +2,12 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-11 · 修复 Stage 3 GSM8K 轨迹分类来源
+
+- Kaggle `support_benchmark_metrics` 实证 `identity_vector_length_mismatch`：正式 batch 有 8 条轨迹，但 scalar GSM8K reward 不产生可选 `acc` extra-info，导致分类标签为空。
+- Stage 3 现直接复用已计算的 `token_level_scores`，严格校验二值 sequence reward 后构造逐轨迹 `correct`/`non_correct` 标签；不增加 forward，也不修改 reward 或 dynamic filtering。
+- 修复运行时提交为 `8f30db5feb99b77417672aefe4f0afdfeed37604`；本地测试覆盖 8 条标签和非二值 fail-closed。
+
 ## 2026-08-11 · 提高 Kaggle 2xT4 动态过滤采样成功率
 
 - Kaggle 实跑确认旧 `rollout_n=2` 在 5 批生成内未产生奖励有方差的 prompt group，训练按设计在 dynamic filtering 阶段 fail-closed。
