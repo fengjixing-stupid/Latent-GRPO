@@ -2,6 +2,12 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-11 · 限制双 T4 embedding unshard 峰值
+
+- Kaggle `update_policy` 实证在 padded latent embedding lookup 中调用递归 `FSDP.summon_full_params`，GPU 仅余 30.69 MiB 时为 unshard 再申请 234 MiB 并 OOM。
+- Embedding lookup 现仅 unshard root-owned 参数、在边界释放 allocator 缓存，并把 padded/packed 路径的重复 lookup 合并为一次；输出在上下文内立即 detach，保持原 latent mixture 语义。
+- Kaggle launcher 强制追加 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`；修复运行时提交为 `081d6de33b720a0f64a30d134f423f6993905e83`。
+
 ## 2026-08-11 · 排除 masked token 的 PPO 数值污染
 
 - Kaggle 双 T4 实证 195 个有效 response token 的 policy/KL/ratio count 均完整，但上游 `pg_loss`、`ppo_kl`、`grad_norm` 为 NaN；根因为 padding 非有限值经 `NaN * 0` 污染 masked reduction。
