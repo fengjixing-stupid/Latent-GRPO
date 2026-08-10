@@ -2,11 +2,17 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-11 · 撤回 Kaggle CUDA allocator 强制配置
+
+- Kaggle 实证 `expandable_segments:True` 使 SGLang 权重同步进入 CUDA IPC 重建，并因容器拒绝 `pidfd_getfd` 而在首个 rollout 前失败；该错误不是 OOM。
+- Launcher 不再注入 `PYTORCH_CUDA_ALLOC_CONF`，并原样保留调用方已有配置；FSDP root-only unshard、单次 embedding lookup 和 masked PPO/Gumbel 修复不变。
+- 修复运行时提交为 `d1fb7b59b9bddfe62ad6cb0b78895f42f5eff066`；真实 3-GPU 行为仍需目标机器验证。
+
 ## 2026-08-11 · 限制双 T4 embedding unshard 峰值
 
 - Kaggle `update_policy` 实证在 padded latent embedding lookup 中调用递归 `FSDP.summon_full_params`，GPU 仅余 30.69 MiB 时为 unshard 再申请 234 MiB 并 OOM。
 - Embedding lookup 现仅 unshard root-owned 参数、在边界释放 allocator 缓存，并把 padded/packed 路径的重复 lookup 合并为一次；输出在上下文内立即 detach，保持原 latent mixture 语义。
-- Kaggle launcher 强制追加 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`；修复运行时提交为 `081d6de33b720a0f64a30d134f423f6993905e83`。
+- FSDP 峰值修复运行时提交为 `081d6de33b720a0f64a30d134f423f6993905e83`；其中曾加入的 Kaggle allocator 强制配置已由后续提交撤回。
 
 ## 2026-08-11 · 排除 masked token 的 PPO 数值污染
 
