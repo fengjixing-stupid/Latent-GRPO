@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class LauncherTests(unittest.TestCase):
-    def test_kaggle_runtime_enables_expandable_cuda_allocator_segments(self) -> None:
+    def test_kaggle_runtime_does_not_force_cuda_allocator_configuration(self) -> None:
         config = load_config(
             ROOT / "configs" / "kaggle-t4-30-metric.yaml", workspace_root=ROOT
         )
@@ -28,9 +28,7 @@ class LauncherTests(unittest.TestCase):
             return 0
 
         launch(config, run_command=fake_run, environment={})
-        self.assertEqual(
-            seen[-1]["PYTORCH_CUDA_ALLOC_CONF"], "expandable_segments:True"
-        )
+        self.assertNotIn("PYTORCH_CUDA_ALLOC_CONF", seen[-1])
 
         launch(
             config,
@@ -39,7 +37,7 @@ class LauncherTests(unittest.TestCase):
         )
         self.assertEqual(
             seen[-1]["PYTORCH_CUDA_ALLOC_CONF"],
-            "max_split_size_mb:128,expandable_segments:True",
+            "max_split_size_mb:128",
         )
 
     def test_metrics_config_authoritatively_sets_observer_environment(self) -> None:
