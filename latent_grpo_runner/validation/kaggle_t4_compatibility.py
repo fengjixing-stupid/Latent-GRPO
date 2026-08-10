@@ -14,17 +14,22 @@ EXPECTED_PYTHON_PREFIX = "3.10"
 _REQUIRED_PACKAGES = (
     "torch", "ray", "transformers", "sglang", "sgl-kernel",
     "compressed-tensors", "flashinfer-python", "cuda-python",
-    "cuda-bindings", "pyarrow",
+    "cuda-bindings", "pyarrow", "cachetools", "openai", "tiktoken",
+    "torch-memory-saver",
 )
 _EXPECTED_VERSION_PREFIXES = {
     "torch": "2.6.0",
     "transformers": "4.51.1",
     "sglang": "0.4.6.post1",
-    "sgl-kernel": "0.1.0",
+    "sgl-kernel": "0.1.1",
     "compressed-tensors": "0.9.3",
     "flashinfer-python": "0.2.5",
     "cuda-python": "12.9.0",
     "cuda-bindings": "12.9.0",
+    "cachetools": "5.5.2",
+    "openai": "1.109.1",
+    "tiktoken": "0.13.0",
+    "torch-memory-saver": "0.0.8",
 }
 
 

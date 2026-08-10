@@ -32,6 +32,10 @@ _TARGET_PACKAGES = (
     "flashinfer-python",
     "cuda-python",
     "cuda-bindings",
+    "cachetools",
+    "openai",
+    "tiktoken",
+    "torch-memory-saver",
 )
 
 

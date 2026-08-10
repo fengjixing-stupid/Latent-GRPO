@@ -8,7 +8,7 @@ target_hardware:
   required_gpus: 2
   min_vram_gb: 14
 batch:
-  prompt_batch: 1
+  prompt_batch: 2
   rollout_n: 2
   mini_prompt_batch: 1
   actor_micro_batch_per_gpu: 1
@@ -29,16 +29,18 @@ model:
 data:
   train_files: data/GSM8k-Aug-oss-dup-all.parquet
   val_files: data/GSM8k-Aug-test.parquet
-  max_prompt_length: 64
+  max_prompt_length: 256
   max_response_length: 32
+  filter_overlong_prompts: true
+  filter_overlong_prompts_workers: 1
 rollout:
   name: sglang
   dtype: float16
   attention_backend: triton
   tensor_parallel_size: 1
   sequence_parallel_size: 1
-  max_model_len: 96
-  max_num_batched_tokens: 96
+  max_model_len: 288
+  max_num_batched_tokens: 288
   gpu_memory_utilization: 0.25
   max_topk: 10
   temperature: 0.6

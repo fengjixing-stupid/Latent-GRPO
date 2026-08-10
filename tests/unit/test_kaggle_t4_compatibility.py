@@ -12,12 +12,16 @@ class KaggleT4CompatibilityTests(unittest.TestCase):
             "ray": "test",
             "transformers": "4.51.1",
             "sglang": "0.4.6.post1",
-            "sgl-kernel": "0.1.0",
+            "sgl-kernel": "0.1.1",
             "compressed-tensors": "0.9.3",
             "flashinfer-python": "0.2.5+cu124torch2.6",
             "cuda-python": "12.9.0",
             "cuda-bindings": "12.9.0",
             "pyarrow": "test",
+            "cachetools": "5.5.2",
+            "openai": "1.109.1",
+            "tiktoken": "0.13.0",
+            "torch-memory-saver": "0.0.8",
         }
         packages = {name: {"status": "present", "version": version} for name, version in versions.items()}
         return {
@@ -56,6 +60,13 @@ class KaggleT4CompatibilityTests(unittest.TestCase):
         self.assertEqual(report["runtime_precision"], "fp16")
         self.assertEqual(report["sampling_backend"], "flashinfer_preserved")
         self.assertEqual(report["blockers"], [])
+
+    def test_old_sgl_kernel_is_rejected(self) -> None:
+        environment = self._environment()
+        environment["dependency_check_status"]["sgl-kernel"]["version"] = "0.1.0"
+        report = self._assess(environment=environment)
+        self.assertEqual(report["status"], "BLOCKED")
+        self.assertIn("runtime_version_mismatch:sgl-kernel:0.1.0", report["blockers"])
 
     def test_semantic_backend_regression_fails_closed(self) -> None:
         report = self._assess(flashinfer_sampling_preserved=False)

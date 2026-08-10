@@ -1,6 +1,9 @@
 # Direct runtime distributions from the vendored SGLang 0.4.6.post1
 # pyproject.  The vendored fork itself is installed separately with --no-deps.
 aiohttp
+cachetools==5.5.2
+openai==1.109.1
+tiktoken==0.13.0
 requests
 tqdm
 setproctitle
@@ -30,9 +33,13 @@ outlines>=0.0.44,<=0.1.11
 partial-json-parser
 einops
 cuda-python
-flashinfer-python==0.2.3
+flashinfer-python==0.2.5
 modelscope
 
-# sgl-kernel 0.1.0 (vendored metadata) versus 0.1.1 (author README), and
-# flash-attn 2.7.3 wheel/ABI are intentionally installed in a guarded target
-# step after Python/torch/CUDA probes. They are not resolved on macOS.
+# These native/runtime wheels are pinned to the exact dual-T4 stack that passed
+# the real Kaggle pre-backward probe. The installer handles them in a guarded
+# binary-only step before installing the vendored forks with --no-deps.
+sgl-kernel==0.1.1
+torch-memory-saver==0.0.8
+
+# flash-attn 2.7.3 wheel/ABI remains target-only and is not resolved on macOS.

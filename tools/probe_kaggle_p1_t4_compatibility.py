@@ -67,18 +67,28 @@ def _runtime_import_checks():
         "cuda.bindings",
         "triton",
         "torchvision",
+        "cachetools",
+        "openai",
+        "tiktoken",
+        "torch_memory_saver",
+        "sglang.srt.torch_memory_saver_adapter",
         "sglang.srt.layers.sampler",
         "sglang.srt.layers.attention.triton_backend",
         "verl.models.transformers.monkey_patch",
         "verl.workers.actor.dp_actor",
         "verl.workers.fsdp_workers",
+        "verl.workers.rollout.async_server",
+        "verl.trainer.ppo.ray_trainer",
     )
     expected_roots = {
+        "sglang.srt.torch_memory_saver_adapter": ROOT / "Latent-GRPO/sglang_latent_reasoning_pkg/python",
         "sglang.srt.layers.sampler": ROOT / "Latent-GRPO/sglang_latent_reasoning_pkg/python",
         "sglang.srt.layers.attention.triton_backend": ROOT / "Latent-GRPO/sglang_latent_reasoning_pkg/python",
         "verl.models.transformers.monkey_patch": ROOT / "Latent-GRPO/verl-0.4.x",
         "verl.workers.actor.dp_actor": ROOT / "Latent-GRPO/verl-0.4.x",
         "verl.workers.fsdp_workers": ROOT / "Latent-GRPO/verl-0.4.x",
+        "verl.workers.rollout.async_server": ROOT / "Latent-GRPO/verl-0.4.x",
+        "verl.trainer.ppo.ray_trainer": ROOT / "Latent-GRPO/verl-0.4.x",
     }
     results = {}
     for module in modules:
@@ -157,6 +167,10 @@ def main(argv=None):
                 "cuda-bindings",
                 "ray",
                 "pyarrow",
+                "cachetools",
+                "openai",
+                "tiktoken",
+                "torch-memory-saver",
             )
         }
         source_checks = {

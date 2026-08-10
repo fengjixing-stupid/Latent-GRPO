@@ -63,7 +63,14 @@ _NESTED_KEYS = {
             "use_kl_loss",
         }
     ),
-    "data": frozenset({"train_files", "val_files", "max_prompt_length", "max_response_length"}),
+    "data": frozenset({
+        "train_files",
+        "val_files",
+        "max_prompt_length",
+        "max_response_length",
+        "filter_overlong_prompts",
+        "filter_overlong_prompts_workers",
+    }),
     "rollout": frozenset(
         {
             "name",
@@ -135,6 +142,8 @@ class DataConfig:
     val_files: str
     max_prompt_length: int
     max_response_length: int
+    filter_overlong_prompts: bool | None = None
+    filter_overlong_prompts_workers: int | None = None
 
 
 @dataclass(frozen=True)
@@ -220,7 +229,7 @@ class ResolvedConfig:
             "hardware": {"required_gpus": self.hardware.required_gpus, "min_vram_gb": self.hardware.min_vram_gb},
             "batch": self.batch.__dict__,
             "model": self.model.__dict__,
-            "data": self.data.__dict__,
+            "data": {key: value for key, value in self.data.__dict__.items() if value is not None},
             "rollout": self.rollout.__dict__,
             "training": self.training.__dict__,
             "paths": {key: _safe_relative_path(value, self.workspace_root) for key, value in self.paths.items()},
@@ -286,6 +295,10 @@ class ResolvedConfig:
             "trainer.total_training_steps": self.training.max_steps,
             "trainer.default_local_dir": self.paths["output_root"],
         }
+        if self.data.filter_overlong_prompts is not None:
+            values["data.filter_overlong_prompts"] = self.data.filter_overlong_prompts
+        if self.data.filter_overlong_prompts_workers is not None:
+            values["data.filter_overlong_prompts_workers"] = self.data.filter_overlong_prompts_workers
         if self.rollout.attention_backend is not None:
             # Attention backend is an engineering/runtime knob. Deliberately do
             # not expose sampling_backend here: the author latent/response sampler
@@ -457,6 +470,16 @@ def _build_config(raw: Mapping[str, Any], root: Path) -> ResolvedConfig:
                 val_files=_expect_str(raw["data"], "val_files"),
                 max_prompt_length=_expect_int(raw["data"], "max_prompt_length"),
                 max_response_length=_expect_int(raw["data"], "max_response_length"),
+                filter_overlong_prompts=(
+                    _expect_bool(raw["data"], "filter_overlong_prompts")
+                    if "filter_overlong_prompts" in raw["data"]
+                    else None
+                ),
+                filter_overlong_prompts_workers=(
+                    _expect_int(raw["data"], "filter_overlong_prompts_workers")
+                    if "filter_overlong_prompts_workers" in raw["data"]
+                    else None
+                ),
             ),
             rollout=RolloutConfig(
                 name=_expect_str(raw["rollout"], "name"),
@@ -546,7 +569,7 @@ def _validate_semantics(config: ResolvedConfig) -> None:
         ):
             raise ConfigError("kaggle-t4-monitor requires checkpointing and all configured offloads")
         if (
-            config.batch.prompt_batch != 1
+            config.batch.prompt_batch != 2
             or config.batch.rollout_n != 2
             or config.batch.mini_prompt_batch != 1
             or config.batch.actor_micro_batch_per_gpu != 1
@@ -555,8 +578,12 @@ def _validate_semantics(config: ResolvedConfig) -> None:
             or config.batch.ppo_epochs != 1
         ):
             raise ConfigError("kaggle-t4-monitor requires the fixed minimal monitor batch geometry")
-        if config.data.max_prompt_length > 64 or config.data.max_response_length > 32:
+        if config.data.max_prompt_length > 256 or config.data.max_response_length > 32:
             raise ConfigError("kaggle-t4-monitor prompt/response limits exceed the monitor budget")
+        if config.data.filter_overlong_prompts is not True:
+            raise ConfigError("kaggle-t4-monitor requires filter_overlong_prompts=true")
+        if config.data.filter_overlong_prompts_workers != 1:
+            raise ConfigError("kaggle-t4-monitor requires exactly one overlong-prompt filter worker")
         if config.rollout.gpu_memory_utilization > 0.30:
             raise ConfigError("kaggle-t4-monitor SGLang memory utilization must stay <= 0.30")
     elif config.training.pre_backward_monitor_probe:

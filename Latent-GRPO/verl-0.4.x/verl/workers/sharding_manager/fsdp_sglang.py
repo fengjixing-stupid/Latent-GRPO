@@ -47,6 +47,20 @@ def _preprocess_tensor_for_update_weights(tensor: torch.Tensor):
     return tensor
 
 
+def _get_or_create_event_loop():
+    try:
+        loop = asyncio.get_event_loop()
+    except RuntimeError as error:
+        if "There is no current event loop" not in str(error):
+            raise
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    if loop.is_closed():
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+    return loop
+
+
 class FSDPSGLangShardingManager(BaseShardingManager):
     @check_device_is_available()
     def __init__(
@@ -100,7 +114,7 @@ class FSDPSGLangShardingManager(BaseShardingManager):
         device = torch.cuda.current_device()  # used when fsdp2 set cpu_offload_policy
         params = {k: v.to(device, non_blocking=True) if fsdp_version(self.module) == 2 else v for k, v in params.items()}
         # Copy, not share memory
-        loop = asyncio.get_event_loop()
+        loop = _get_or_create_event_loop()
         loop.run_until_complete(self.update_weights(params))
         log_gpu_memory_usage("After sync model weights in sharding manager", logger=logger)
 
@@ -118,7 +132,7 @@ class FSDPSGLangShardingManager(BaseShardingManager):
     @GPUMemoryLogger(role="FSDPSGLangShardingManager exit", logger=logger)
     def __exit__(self, exc_type, exc_value, traceback):
         log_gpu_memory_usage("Before SGLang offload in sharding manager", logger=logger)
-        loop = asyncio.get_event_loop()
+        loop = _get_or_create_event_loop()
         loop.run_until_complete(self.release_memory())
         log_gpu_memory_usage("After SGLang offload in sharding manager", logger=logger)
 

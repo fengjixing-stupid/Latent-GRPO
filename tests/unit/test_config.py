@@ -24,7 +24,7 @@ class ConfigTests(unittest.TestCase):
     def test_kaggle_monitor_profile_is_fail_closed_before_backward(self) -> None:
         config = load_config(ROOT / "configs" / "kaggle-t4-monitor.yaml", workspace_root=ROOT)
         self.assertEqual(config.hardware.required_gpus, 2)
-        self.assertEqual(config.batch_arithmetic(), (1, 1, 1, 1))
+        self.assertEqual(config.batch_arithmetic(), (2, 1, 1, 2))
         self.assertTrue(config.training.pre_backward_monitor_probe)
         self.assertEqual(config.rollout.dtype, "float16")
         self.assertEqual(config.rollout.attention_backend, "triton")
@@ -33,7 +33,16 @@ class ConfigTests(unittest.TestCase):
         self.assertTrue(config.model.actor_param_offload)
         self.assertTrue(config.model.actor_optimizer_offload)
         self.assertTrue(config.model.ref_param_offload)
+        self.assertEqual(config.data.max_prompt_length, 256)
+        self.assertEqual(config.data.max_response_length, 32)
+        self.assertIs(config.data.filter_overlong_prompts, True)
+        self.assertEqual(config.data.filter_overlong_prompts_workers, 1)
+        self.assertEqual(config.rollout.max_model_len, 288)
+        self.assertEqual(config.rollout.max_num_batched_tokens, 288)
         overrides = config.author_hydra_overrides()
+        self.assertIn("data.train_batch_size=2", overrides)
+        self.assertIn("data.filter_overlong_prompts=true", overrides)
+        self.assertIn("data.filter_overlong_prompts_workers=1", overrides)
         self.assertIn("trainer.pre_backward_monitor_probe=true", overrides)
         self.assertIn("trainer.val_before_train=false", overrides)
         self.assertIn("trainer.test_freq=-1", overrides)
@@ -56,6 +65,14 @@ class ConfigTests(unittest.TestCase):
             config.with_runtime_overrides(resume_from=Path("fake/global_step_1"))
         with self.assertRaisesRegex(ConfigError, "requires metrics_enabled"):
             config.with_runtime_overrides(metrics_enabled=False)
+
+    def test_non_kaggle_profiles_preserve_upstream_prompt_filter_defaults(self) -> None:
+        config = load_config(ROOT / "configs" / "smoke.yaml", workspace_root=ROOT)
+        self.assertIsNone(config.data.filter_overlong_prompts)
+        self.assertIsNone(config.data.filter_overlong_prompts_workers)
+        overrides = config.author_hydra_overrides()
+        self.assertFalse(any(item.startswith("data.filter_overlong_prompts=") for item in overrides))
+        self.assertFalse(any(item.startswith("data.filter_overlong_prompts_workers=") for item in overrides))
 
     def test_three_gpu_profiles_satisfy_full_per_rank_batch_arithmetic(self) -> None:
         expected = {

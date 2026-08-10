@@ -43,12 +43,14 @@ PYTHON_BIN="${VENV_DIR}/bin/python"
 "${PYTHON_BIN}" -m pip install \
   torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 \
   --index-url https://download.pytorch.org/whl/cu124
-"${PYTHON_BIN}" -m pip install --no-deps --no-cache-dir sgl-kernel==0.1.0
+"${PYTHON_BIN}" -m pip install --no-deps --no-cache-dir --only-binary=:all: sgl-kernel==0.1.1
 "${PYTHON_BIN}" -m pip install --no-deps --no-cache-dir \
   flashinfer-python==0.2.5 \
   --index-url https://flashinfer.ai/whl/cu124/torch2.6
 "${PYTHON_BIN}" -m pip install cuda-python==12.9.0 cuda-bindings==12.9.0
 "${PYTHON_BIN}" -m pip install --no-deps torchao==0.10.0
+"${PYTHON_BIN}" -m pip install --no-deps --no-cache-dir --only-binary=:all: \
+  torch-memory-saver==0.0.8
 
 TMP_REQ="$(mktemp)"
 TMP_CONSTRAINTS="$(mktemp)"
@@ -59,12 +61,16 @@ torchvision==0.21.0
 torchaudio==2.6.0
 triton==3.2.0
 transformers==4.51.1
-sgl-kernel==0.1.0
+sgl-kernel==0.1.1
 compressed-tensors==0.9.3
 flashinfer-python==0.2.5
 cuda-python==12.9.0
 cuda-bindings==12.9.0
 torchao==0.10.0
+cachetools==5.5.2
+openai==1.109.1
+tiktoken==0.13.0
+torch-memory-saver==0.0.8
 CONSTRAINTS
 
 # reward-math is intentionally excluded: this gate is data-free and only
@@ -73,7 +79,7 @@ CONSTRAINTS
   -r "${ROOT}/requirements/runtime-core.txt" \
   -r "${ROOT}/requirements/metrics.txt"
 
-grep -Ev '^(flashinfer-python|sgl-kernel|cuda-python|cuda-bindings|torchao)([<=> ]|$)' \
+grep -Ev '^(flashinfer-python|sgl-kernel|torch-memory-saver|cuda-python|cuda-bindings|torchao)([<=> ]|$)' \
   "${ROOT}/requirements/runtime-sglang.txt" > "${TMP_REQ}"
 "${PYTHON_BIN}" -m pip install -c "${TMP_CONSTRAINTS}" -r "${TMP_REQ}"
 
