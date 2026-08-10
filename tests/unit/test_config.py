@@ -79,6 +79,8 @@ class ConfigTests(unittest.TestCase):
         overrides = config.author_hydra_overrides()
         self.assertFalse(any(item.startswith("data.filter_overlong_prompts=") for item in overrides))
         self.assertFalse(any(item.startswith("data.filter_overlong_prompts_workers=") for item in overrides))
+        self.assertFalse(any(item.startswith("actor_rollout_ref.actor.checkpoint.contents=") for item in overrides))
+        self.assertFalse(any(item == "trainer.resume_mode=disable" for item in overrides))
 
     def test_three_gpu_profiles_satisfy_full_per_rank_batch_arithmetic(self) -> None:
         expected = {

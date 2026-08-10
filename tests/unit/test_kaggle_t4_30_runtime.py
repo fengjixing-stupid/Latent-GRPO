@@ -40,7 +40,7 @@ class KaggleT430RuntimeTests(unittest.TestCase):
         cls.F = F
 
     def test_full_metric_profile_is_a_one_step_dual_t4_checkpoint_run(self) -> None:
-        from latent_grpo_runner.config import load_config
+        from latent_grpo_runner.config import ConfigError, load_config
 
         config = load_config(ROOT / "configs/kaggle-t4-30-metric.yaml", workspace_root=ROOT)
         self.assertEqual(config.profile_name, "kaggle-t4-30-metric")
@@ -58,6 +58,12 @@ class KaggleT430RuntimeTests(unittest.TestCase):
         self.assertIn("algorithm.filter_groups.max_num_gen_batches=10", overrides)
         self.assertIn("trainer.save_freq=1", overrides)
         self.assertIn("trainer.test_freq=-1", overrides)
+        self.assertIn(
+            "actor_rollout_ref.actor.checkpoint.contents=[model,extra]", overrides
+        )
+        self.assertIn("trainer.resume_mode=disable", overrides)
+        with self.assertRaisesRegex(ConfigError, "does not support checkpoint resume"):
+            config.with_runtime_overrides(resume_from=Path("global_step_1"))
 
     def test_gumbel_function_exposes_real_graph_intermediates_only_when_requested(self) -> None:
         torch = self.torch

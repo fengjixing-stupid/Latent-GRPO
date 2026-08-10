@@ -322,6 +322,8 @@ class ResolvedConfig:
             values["trainer.test_freq"] = -1
             values["trainer.save_freq"] = 1
             values["trainer.logger"] = "[console]"
+            values["actor_rollout_ref.actor.checkpoint.contents"] = "[model,extra]"
+            values["trainer.resume_mode"] = "disable"
         if self.resume_from is not None:
             values["trainer.resume_mode"] = "resume_path"
             values["trainer.resume_from_path"] = self.resume_from
@@ -347,6 +349,8 @@ class ResolvedConfig:
         checkpoint_probe_enabled: bool | None = None,
         credit_probe_enabled: bool | None = None,
     ) -> "ResolvedConfig":
+        if self.profile_name == "kaggle-t4-30-metric" and resume_from is not None:
+            raise ConfigError("kaggle-t4-30-metric lightweight checkpoint does not support checkpoint resume")
         if self.training.pre_backward_monitor_probe:
             if max_steps not in {None, 1}:
                 raise ConfigError("kaggle-t4-monitor cannot override max_steps beyond 1")

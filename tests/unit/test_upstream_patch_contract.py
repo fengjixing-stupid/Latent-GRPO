@@ -218,6 +218,24 @@ class UpstreamPatchContractTests(unittest.TestCase):
         latest_index = save_source.index("latest_checkpointed_iteration.txt")
         self.assertLess(sidecar_index, latest_index)
 
+    def test_fsdp_checkpoint_honors_selected_components_and_releases_them_sequentially(self) -> None:
+        source = _source("verl-0.4.x/verl/utils/checkpoint/fsdp_checkpoint_manager.py")
+        save_source = ast.get_source_segment(source, _function(source, "save_checkpoint"))
+        load_source = ast.get_source_segment(source, _function(source, "load_checkpoint"))
+
+        for component in ("model", "optimizer", "extra"):
+            guard = f'if "{component}" in self.checkpoint_contents:'
+            self.assertIn(guard, save_source)
+            self.assertIn(guard, load_source)
+
+        model_create = save_source.index("model_state_dict = self.model.state_dict()")
+        model_delete = save_source.index("del model_state_dict", model_create)
+        optimizer_create = save_source.index("optimizer_state_dict = self.optimizer.state_dict()", model_delete)
+        optimizer_delete = save_source.index("del optimizer_state_dict", optimizer_create)
+        self.assertLess(model_create, model_delete)
+        self.assertLess(model_delete, optimizer_create)
+        self.assertLess(optimizer_create, optimizer_delete)
+
     def test_raw_generated_tokens_are_collected_immediately_after_each_real_generation_attempt(self) -> None:
         source = _source("verl-0.4.x/verl/trainer/ppo/ray_trainer.py")
         fit_source = ast.get_source_segment(source, _function(source, "fit"))
