@@ -111,6 +111,7 @@ class DataParallelPPOActor(BasePPOActor):
             "optimizer_steps": [],
             "component_sufficient_stats": [],
             "p1_sufficient_stats": {},
+            "checkpoint_probe": None,
         }
         self._last_optimizer_did_step = False
         self.last_update_did_step = False
@@ -200,19 +201,23 @@ class DataParallelPPOActor(BasePPOActor):
             "p1_sufficient_stats": dict(
                 self._latent_grpo_observer_facts["p1_sufficient_stats"]
             ),
+            "checkpoint_probe": self._latent_grpo_observer_facts["checkpoint_probe"],
         }
         self._latent_grpo_observer_facts = {
             "optimizer_steps": [],
             "component_sufficient_stats": [],
             "p1_sufficient_stats": {},
+            "checkpoint_probe": None,
         }
         return facts
 
     def _forward_micro_batch(self, micro_batch, temperature, top_p,  calculate_entropy=False, add_noise_dirichlet=False,
                              add_noise_gumbel_softmax=True, collect_component_stats=False,
-                             component_response_mask=None) -> Tuple[
+                             component_response_mask=None, collect_checkpoint_probe=False) -> Tuple[
         torch.Tensor, torch.Tensor]:
         _require_remove_padding_runtime(self.use_remove_padding)
+        if collect_checkpoint_probe and self.use_remove_padding:
+            raise RuntimeError("checkpoint probe currently requires the bounded padded actor path")
 
         def safe_lookup_embeddings(fsdp_wrapped_module, input_ids, target_device=None, target_dtype=None):
             """Look up embeddings safely when the module is wrapped by FSDP."""
@@ -257,6 +262,7 @@ class DataParallelPPOActor(BasePPOActor):
             position_ids = micro_batch["position_ids"]
             gumbel_temperature = micro_batch["gumbel_temperature"][0].item()
             entropy = None
+            checkpoint_probe_tensors = None
             if position_ids.dim() == 3:  # qwen2vl mrope
                 position_ids = position_ids.transpose(0, 1)  # (bsz, 3, seqlen) -> (3, bsz, seqlen)
             if self.use_remove_padding:
@@ -585,7 +591,7 @@ class DataParallelPPOActor(BasePPOActor):
                 advantages = micro_batch.get("advantages", None)
 
                 if add_noise_gumbel_softmax:
-                    log_probs = logprobs_from_logits_topk_gumbel(
+                    log_prob_result = logprobs_from_logits_topk_gumbel(
                         logits=response_logits,
                         rollout_topk_ids=next_topk_ids,
                         rollout_topk_gumbels=next_topk_gumbels,
@@ -594,7 +600,12 @@ class DataParallelPPOActor(BasePPOActor):
                         temperature=temperature,
                         inplace_backward=not calculate_entropy,
                         advantages=advantages,
+                        return_probe_tensors=collect_checkpoint_probe,
                     )
+                    if collect_checkpoint_probe:
+                        log_probs, checkpoint_probe_tensors = log_prob_result
+                    else:
+                        log_probs = log_prob_result
                 else:
                     full_logprobs = top_p_renorm_logprobs(response_logits / temperature, top_p)
                     log_probs = full_logprobs.gather(
@@ -643,7 +654,10 @@ class DataParallelPPOActor(BasePPOActor):
                 full_topk_probs = full_topk_probs[:, :-1, :].contiguous()
                 full_topk_indices = full_topk_indices[:, :-1, :].contiguous()
             
-            return entropy, log_probs, full_topk_probs, full_topk_indices, full_current_topk_logits
+            result = (entropy, log_probs, full_topk_probs, full_topk_indices, full_current_topk_logits)
+            if collect_checkpoint_probe:
+                return (*result, checkpoint_probe_tensors)
+            return result
     def _optimizer_step(self):
         assert self.config.grad_clip is not None
         if isinstance(self.actor_module, FSDP):
@@ -756,8 +770,16 @@ class DataParallelPPOActor(BasePPOActor):
         pre_backward_monitor_probe = bool(
             data.meta_info.get("pre_backward_monitor_probe", False)
         )
+        checkpoint_probe_requested = bool(data.meta_info.get("checkpoint_probe", False))
+        credit_probe_enabled = str(
+            os.getenv("LATENT_GRPO_CREDIT_PROBE_ENABLED", "0")
+        ).strip().lower() in {"1", "true", "yes", "on"}
         if pre_backward_monitor_probe and not self._latent_grpo_observer_enabled:
             raise RuntimeError("pre-backward monitor probe requires the durable observer")
+        if checkpoint_probe_requested and (
+            not self._latent_grpo_observer_enabled or not credit_probe_enabled
+        ):
+            raise RuntimeError("checkpoint credit probe requires the durable observer and credit feature")
 
         temperature = data.meta_info["temperature"]  # temperature must be in the data.meta_info to avoid silent error
         top_p = data.meta_info["top_p"]
@@ -785,6 +807,7 @@ class DataParallelPPOActor(BasePPOActor):
             dataloader = batch.split(self.config.ppo_mini_batch_size)
 
         metrics = {}
+        checkpoint_probe_collected = False
         for epoch in range(self.config.ppo_epochs):
             for batch_idx, data in enumerate(dataloader):
                 mini_batch = data
@@ -839,12 +862,24 @@ class DataParallelPPOActor(BasePPOActor):
                         is_clipped = cur_response_length == response_length
                         if "advantages" in data:
                             data["advantages"][is_clipped] = 0
-                    entropy, log_prob,_,_,current_logits = self._forward_micro_batch(micro_batch=data, temperature=temperature, top_p=top_p,
-                                                                  calculate_entropy=calculate_entropy,
-                                                                  add_noise_dirichlet=add_noise_dirichlet,
-                                                                  add_noise_gumbel_softmax=add_noise_gumbel_softmax,
-                                                                  collect_component_stats=self._latent_grpo_observer_enabled,
-                                                                  component_response_mask=response_mask,)
+                    collect_checkpoint_probe = (
+                        checkpoint_probe_requested and not checkpoint_probe_collected
+                    )
+                    forward_result = self._forward_micro_batch(
+                        micro_batch=data,
+                        temperature=temperature,
+                        top_p=top_p,
+                        calculate_entropy=calculate_entropy,
+                        add_noise_dirichlet=add_noise_dirichlet,
+                        add_noise_gumbel_softmax=add_noise_gumbel_softmax,
+                        collect_component_stats=self._latent_grpo_observer_enabled,
+                        component_response_mask=response_mask,
+                        collect_checkpoint_probe=collect_checkpoint_probe,
+                    )
+                    if collect_checkpoint_probe:
+                        entropy, log_prob, _, _, current_logits, checkpoint_tensors = forward_result
+                    else:
+                        entropy, log_prob, _, _, current_logits = forward_result
                     
                     neg_adv_weight = self.config.get("neg_adv_weight", 1.0)
                     policy_result = compute_policy_loss(
@@ -914,6 +949,49 @@ class DataParallelPPOActor(BasePPOActor):
                     }
                     append_to_dict(metrics, metric_row)
 
+                    if collect_checkpoint_probe:
+                        from latent_grpo_runner.metrics.probe import collect_checkpoint_probe_packet
+
+                        if checkpoint_tensors is None:
+                            raise RuntimeError("checkpoint probe tensors were not returned by the Gumbel path")
+                        next_topk_ids = data["rollout_topk_ids"][:, -response_length:, :]
+                        next_topk_gumbels = data["rollout_topk_gumbels"][:, -response_length:, :]
+                        hard_token_mask, mixture_weights = _latent_mixture_weights(
+                            next_topk_ids,
+                            next_topk_gumbels,
+                            data["gumbel_temperature"][0].item(),
+                        )
+                        valid_positions = response_mask.bool() & ~hard_token_mask
+                        valid_components = valid_positions.unsqueeze(-1) & (next_topk_ids != -100)
+                        expanded_advantages = advantages.unsqueeze(-1).expand_as(
+                            checkpoint_tensors["topk_log_probs"]
+                        )
+                        trajectory_masks, position_masks = _checkpoint_probe_group_masks(
+                            valid_positions=valid_positions,
+                            response_mask=response_mask,
+                            token_level_rewards=data["token_level_rewards"],
+                            component_count=next_topk_ids.size(-1),
+                        )
+                        self._latent_grpo_observer_facts["checkpoint_probe"] = (
+                            collect_checkpoint_probe_packet(
+                                policy_loss=loss,
+                                topk_log_probs=checkpoint_tensors["topk_log_probs"],
+                                deltas=checkpoint_tensors["raw_diff"],
+                                mixture_weights=mixture_weights,
+                                valid_component_mask=valid_components,
+                                advantages=expanded_advantages,
+                                trajectory_masks=trajectory_masks,
+                                position_masks=position_masks,
+                                model=self.actor_module,
+                                optimizer=self.actor_optimizer,
+                                flipgrad_trigger_mask=checkpoint_tensors[
+                                    "flipgrad_trigger_mask"
+                                ],
+                                retain_graph=True,
+                            )
+                        )
+                        checkpoint_probe_collected = True
+
                     if pre_backward_monitor_probe:
                         # The real actor forward, Gumbel/FlipGrad gating, PPO loss,
                         # and observer reductions have all run.  Stop here so the
@@ -939,3 +1017,42 @@ class DataParallelPPOActor(BasePPOActor):
         self.last_update_count = update_count
         self.last_update_did_step = update_count > 0
         return metrics
+
+
+def _checkpoint_probe_group_masks(
+    *, valid_positions, response_mask, token_level_rewards, component_count
+):
+    """Build all Stage-4 groups as masks over one shared probe result."""
+    batch_size, response_length = valid_positions.shape
+    shape = (batch_size, response_length, component_count)
+
+    def expand_positions(mask):
+        return mask.unsqueeze(-1).expand(shape)
+
+    reward_sum = token_level_rewards.sum(dim=-1)
+    correct = reward_sum > 0
+    overlong = response_mask.bool().sum(dim=-1) >= response_length
+
+    def expand_trajectories(mask):
+        return mask.view(batch_size, 1, 1).expand(shape)
+
+    ordinal = valid_positions.long().cumsum(dim=-1) - 1
+    latent_count = valid_positions.long().sum(dim=-1, keepdim=True)
+    first = valid_positions & (ordinal == 0)
+    last = valid_positions & (ordinal == (latent_count - 1))
+    middle = valid_positions & ~first & ~last
+    return (
+        {
+            "all": expand_trajectories(torch.ones_like(correct, dtype=torch.bool)),
+            "correct": expand_trajectories(correct),
+            "non_correct": expand_trajectories(~correct),
+            "overlong": expand_trajectories(overlong),
+            "not_overlong": expand_trajectories(~overlong),
+        },
+        {
+            "all": expand_positions(torch.ones_like(valid_positions, dtype=torch.bool)),
+            "first_latent": expand_positions(first),
+            "middle_latent": expand_positions(middle),
+            "last_latent": expand_positions(last),
+        },
+    )

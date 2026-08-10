@@ -97,8 +97,8 @@ def main(argv: list[str] | None = None) -> int:
 
         tokenizer = AutoTokenizer.from_pretrained(config.model.path)
         model_metadata = AutoConfig.from_pretrained(config.model.path)
-        if config.profile_name == "kaggle-t4-monitor" and getattr(model_metadata, "quantization_config", None):
-            raise ConfigError("kaggle-t4-monitor requires the unquantized author SFT model")
+        if config.profile_name in {"kaggle-t4-monitor", "kaggle-t4-30-metric"} and getattr(model_metadata, "quantization_config", None):
+            raise ConfigError("Kaggle T4 profiles require the unquantized author SFT model")
         latent_end_validation = validate_latent_end_token(config.model, tokenizer, model_metadata)
         print(json.dumps({"latent_end_validation": latent_end_validation}, sort_keys=True))
     except (ConfigError, ModuleNotFoundError, OSError, ValueError) as error:

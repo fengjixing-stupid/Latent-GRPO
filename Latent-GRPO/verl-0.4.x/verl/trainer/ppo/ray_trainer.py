@@ -63,6 +63,7 @@ from verl.utils.tracking import ValidationGenerationsLogger
 from verl.workers.rollout.async_server import AsyncLLMServerManager
 
 try:
+    from latent_grpo_runner.metrics.probe import build_checkpoint_probe_event
     from latent_grpo_runner.metrics.support import collect_support_metrics
     from latent_grpo_runner.metrics.p1 import merge_worker_p1_packets
     from latent_grpo_runner.metrics.torch_collectors import (
@@ -77,6 +78,7 @@ try:
     )
 except ImportError:  # The author repository must remain runnable without the external runner.
     attach_stable_ids_to_batch = None
+    build_checkpoint_probe_event = None
     collect_support_metrics = None
     collect_driver_p1_statistics = None
     collect_generated_trajectory_lengths = None
@@ -1152,6 +1154,19 @@ class RayPPOTrainer:
                     and self._latent_grpo_observer.enabled
                 )
                 support_enabled = observer_enabled and os.getenv("LATENT_GRPO_SUPPORT_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
+                checkpoint_probe_enabled = observer_enabled and os.getenv(
+                    "LATENT_GRPO_CHECKPOINT_PROBE_ENABLED", "0"
+                ).strip().lower() in {"1", "true", "yes", "on"}
+                credit_probe_enabled = observer_enabled and os.getenv(
+                    "LATENT_GRPO_CREDIT_PROBE_ENABLED", "0"
+                ).strip().lower() in {"1", "true", "yes", "on"}
+                checkpoint_due = (
+                    checkpoint_probe_enabled
+                    and credit_probe_enabled
+                    and not pre_backward_monitor_probe
+                    and self.config.trainer.save_freq > 0
+                    and (is_last_step or self.global_steps % self.config.trainer.save_freq == 0)
+                )
                 step_started_at = time.perf_counter() if observer_enabled else None
                 p1_driver_payload = None
                 p1_driver_compute_time = 0.0
@@ -1502,6 +1517,7 @@ class RayPPOTrainer:
                             batch.meta_info['add_noise_dirichlet'] = self.config.actor_rollout_ref.rollout.add_noise_dirichlet
                             batch.meta_info['add_noise_gumbel_softmax'] = self.config.actor_rollout_ref.rollout.add_noise_gumbel_softmax
                             batch.meta_info["pre_backward_monitor_probe"] = pre_backward_monitor_probe
+                            batch.meta_info["checkpoint_probe"] = checkpoint_due
                             actor_output = self.actor_rollout_wg.update_actor(batch)
                         worker_observer_packets = actor_output.meta_info.pop(
                             "latent_grpo_worker_observers", []
@@ -1565,6 +1581,38 @@ class RayPPOTrainer:
                             else:
                                 # Preserve the production P1 source contract exactly.
                                 self._latent_grpo_observer.emit("actor_update", actor_update_event)
+                                if checkpoint_due:
+                                    if build_checkpoint_probe_event is None:
+                                        raise RuntimeError("Stage 4 checkpoint probe merger is unavailable")
+                                    checkpoint_packets = [
+                                        {
+                                            "worker_rank": packet["worker_rank"],
+                                            **dict(packet["checkpoint_probe"]),
+                                        }
+                                        for packet in worker_observer_packets
+                                        if isinstance(packet.get("checkpoint_probe"), dict)
+                                    ]
+                                    checkpoint_event = build_checkpoint_probe_event(
+                                        checkpoint_packets,
+                                        expected_worker_count=self.actor_rollout_wg.world_size,
+                                        profile_name=getattr(
+                                            self._latent_grpo_observer,
+                                            "profile_name",
+                                            os.getenv("LATENT_GRPO_OBSERVER_PROFILE_NAME", "unknown"),
+                                        ),
+                                        seed=int(
+                                            getattr(
+                                                self._latent_grpo_observer,
+                                                "seed",
+                                                os.getenv("LATENT_GRPO_OBSERVER_SEED", "0"),
+                                            )
+                                        ),
+                                        global_step=int(self.global_steps),
+                                        optimizer_step=int(self._latent_grpo_observer.optimizer_step),
+                                        checkpoint_step=int(self.global_steps),
+                                        probe_batch_id=f"checkpoint-{self.global_steps}",
+                                    )
+                                    self._latent_grpo_observer.emit("checkpoint_probe", checkpoint_event)
 
                     # Log rollout generations if enabled
                     rollout_data_dir = self.config.trainer.get("rollout_data_dir", None)

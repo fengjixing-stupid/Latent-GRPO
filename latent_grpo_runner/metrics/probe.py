@@ -6,6 +6,7 @@ from dataclasses import dataclass
 import copy
 import math
 import random
+import time
 from typing import Any, Callable, Iterable, Sequence, TypeVar
 
 from .aggregators import SufficientStats
@@ -163,7 +164,18 @@ def build_probe_benchmark_row(
     probe_peak_memory_bytes: int = 0,
     record_available: bool = True,
     record_unavailable_reason: str | None = None,
+    state_preservation: dict[str, bool] | None = None,
 ) -> dict[str, object]:
+    state = state_preservation or {
+        "parameters_unchanged": False,
+        "optimizer_state_unchanged": False,
+        "training_grads_unchanged": False,
+        "cpu_rng_restored": False,
+        "cuda_rng_restored": False,
+        "python_rng_restored": False,
+        "numpy_rng_restored": False,
+        "module_mode_restored": False,
+    }
     return {
         "profile_name": profile_name,
         "seed": seed,
@@ -178,6 +190,9 @@ def build_probe_benchmark_row(
         "probe_rng_restore_succeeded": probe_rng_restore_succeeded,
         "record_available": record_available,
         "record_unavailable_reason": record_unavailable_reason,
+        **state,
+        "extra_loss_backward_executed": False,
+        "extra_optimizer_step_executed": False,
     }
 
 
@@ -188,16 +203,39 @@ def collect_credit_from_autograd(
     mixture_weights: Any,
     valid_component_mask: Any,
     advantages: Any,
+    retain_graph: bool = False,
 ) -> CreditMetrics:
     import torch
 
     if not getattr(topk_log_probs, "requires_grad", False):
         raise ValueError("topk_log_probs must require grad")
-    gradients = torch.autograd.grad(policy_loss, topk_log_probs, retain_graph=False, create_graph=False)[0]
-    credit = -gradients.detach().float()
-    weights = mixture_weights.detach().float()
-    valid = valid_component_mask.detach().bool()
-    advantage_values = advantages.detach().float()
+    gradients = torch.autograd.grad(
+        policy_loss,
+        topk_log_probs,
+        retain_graph=retain_graph,
+        create_graph=False,
+    )[0]
+    return collect_credit_from_values(
+        credit=-gradients.detach(),
+        mixture_weights=mixture_weights,
+        valid_component_mask=valid_component_mask,
+        advantages=advantages,
+    )
+
+
+def collect_credit_from_values(
+    *,
+    credit: Any,
+    mixture_weights: Any,
+    valid_component_mask: Any,
+    advantages: Any,
+) -> CreditMetrics:
+    import torch
+
+    credit = torch.as_tensor(credit).detach().float()
+    weights = torch.as_tensor(mixture_weights).detach().float()
+    valid = torch.as_tensor(valid_component_mask).detach().bool()
+    advantage_values = torch.as_tensor(advantages).detach().float()
     if credit.shape != weights.shape or credit.shape != valid.shape or credit.shape != advantage_values.shape:
         raise ValueError("credit tensors must have identical shape")
 
@@ -249,6 +287,335 @@ def collect_credit_from_autograd(
         spearman_unavailable_reason=spearman_reason,
         alignment_available=alignment_available,
         alignment_unavailable_reason=alignment_reason,
+    )
+
+
+_STATE_PRESERVATION_FIELDS = (
+    "parameters_unchanged",
+    "optimizer_state_unchanged",
+    "training_grads_unchanged",
+    "cpu_rng_restored",
+    "cuda_rng_restored",
+    "python_rng_restored",
+    "numpy_rng_restored",
+    "module_mode_restored",
+)
+
+
+def collect_checkpoint_probe_packet(
+    *,
+    policy_loss: Any,
+    topk_log_probs: Any,
+    deltas: Any,
+    mixture_weights: Any,
+    valid_component_mask: Any,
+    advantages: Any,
+    trajectory_masks: dict[str, Any],
+    position_masks: dict[str, Any],
+    model: Any,
+    optimizer: Any,
+    flipgrad_trigger_mask: Any | None = None,
+    retain_graph: bool = True,
+) -> dict[str, object]:
+    """Run one bounded credit autograd and return a Ray-safe worker packet."""
+    import numpy as np
+    import torch
+
+    tensors = {
+        "topk_log_probs": topk_log_probs,
+        "deltas": deltas,
+        "mixture_weights": mixture_weights,
+        "valid_component_mask": valid_component_mask,
+        "advantages": advantages,
+    }
+    expected_shape = tuple(topk_log_probs.shape)
+    if not getattr(topk_log_probs, "requires_grad", False):
+        raise ValueError("topk_log_probs must require grad")
+    if any(tuple(value.shape) != expected_shape for value in tensors.values()):
+        raise ValueError("checkpoint probe tensors must have identical shape")
+    for family, masks in (("trajectory", trajectory_masks), ("position", position_masks)):
+        if "all" not in masks:
+            raise ValueError(f"{family} masks require an all group")
+        if any(tuple(mask.shape) != expected_shape for mask in masks.values()):
+            raise ValueError(f"{family} masks must match checkpoint probe tensors")
+
+    parameters = tuple(model.parameters())
+    parameter_before = _parameter_token(parameters)
+    optimizer_before = _optimizer_token(optimizer)
+    grads_before = _grad_token(parameters)
+    module_mode_before = bool(model.training)
+    python_rng_before = random.getstate()
+    numpy_rng_before = np.random.get_state()
+    cpu_rng_before = torch.random.get_rng_state().clone()
+    cuda_rng_before = (
+        [state.clone() for state in torch.cuda.get_rng_state_all()]
+        if torch.cuda.is_available()
+        else None
+    )
+    peak_before = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
+    started = time.perf_counter()
+    try:
+        gradients = torch.autograd.grad(
+            policy_loss,
+            topk_log_probs,
+            retain_graph=retain_graph,
+            create_graph=False,
+        )[0]
+    finally:
+        model.train(module_mode_before)
+        random.setstate(python_rng_before)
+        np.random.set_state(numpy_rng_before)
+        torch.random.set_rng_state(cpu_rng_before)
+        if cuda_rng_before is not None:
+            torch.cuda.set_rng_state_all(cuda_rng_before)
+
+    state = {
+        "parameters_unchanged": _parameter_token(parameters) == parameter_before,
+        "optimizer_state_unchanged": _optimizer_token(optimizer) == optimizer_before,
+        "training_grads_unchanged": _grad_token(parameters) == grads_before,
+        "cpu_rng_restored": torch.equal(torch.random.get_rng_state(), cpu_rng_before),
+        "cuda_rng_restored": (
+            True
+            if cuda_rng_before is None
+            else all(
+                torch.equal(left, right)
+                for left, right in zip(torch.cuda.get_rng_state_all(), cuda_rng_before)
+            )
+        ),
+        "python_rng_restored": random.getstate() == python_rng_before,
+        "numpy_rng_restored": _numpy_rng_equal(np.random.get_state(), numpy_rng_before),
+        "module_mode_restored": bool(model.training) == module_mode_before,
+    }
+    if gradients is None or tuple(gradients.shape) != expected_shape:
+        raise RuntimeError("credit autograd did not return an aligned gradient")
+
+    detached_delta = deltas.detach().float()
+    detached_advantages = advantages.detach().float()
+    detached_valid = valid_component_mask.detach().bool()
+    detached_flips = (
+        flipgrad_trigger_mask.detach().bool()
+        if flipgrad_trigger_mask is not None
+        else (detached_advantages <= 0) & (detached_delta < 0)
+    )
+    if tuple(detached_flips.shape) != expected_shape:
+        raise ValueError("flipgrad trigger mask must match checkpoint probe tensors")
+    peak_after = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
+    return {
+        "available": True,
+        "deltas": detached_delta.flatten().cpu().tolist(),
+        "credit": (-gradients.detach().float()).flatten().cpu().tolist(),
+        "mixture_weights": mixture_weights.detach().float().flatten().cpu().tolist(),
+        "advantages": detached_advantages.flatten().cpu().tolist(),
+        "valid_component_mask": detached_valid.flatten().cpu().tolist(),
+        "flipgrad_trigger_mask": detached_flips.flatten().cpu().tolist(),
+        "trajectory_masks": {
+            name: mask.detach().bool().flatten().cpu().tolist()
+            for name, mask in trajectory_masks.items()
+        },
+        "position_masks": {
+            name: mask.detach().bool().flatten().cpu().tolist()
+            for name, mask in position_masks.items()
+        },
+        "trajectory_count": int(expected_shape[0]) if expected_shape else 0,
+        "latent_position_count": int(
+            detached_valid.any(dim=-1).sum().item()
+        ),
+        "credit_autograd_executed": True,
+        "state_preservation": state,
+        "probe_extra_time_seconds": time.perf_counter() - started,
+        "probe_peak_memory_bytes": max(0, int(peak_after - peak_before)),
+    }
+
+
+def build_checkpoint_probe_event(
+    packets: Iterable[dict[str, object]],
+    *,
+    expected_worker_count: int,
+    profile_name: str,
+    seed: int,
+    global_step: int,
+    optimizer_step: int,
+    checkpoint_step: int,
+    probe_batch_id: str,
+) -> dict[str, object]:
+    """Merge bounded rank packets and derive every group from one autograd result."""
+    import torch
+
+    rows = [dict(packet) for packet in packets]
+    ranks = [row.get("worker_rank") for row in rows]
+    if len(rows) != expected_worker_count or sorted(ranks) != list(range(expected_worker_count)):
+        raise ValueError("checkpoint probe requires one uniquely ranked packet per worker")
+    if any(row.get("available") is not True for row in rows):
+        raise ValueError("checkpoint probe worker packet is unavailable")
+
+    vector_fields = (
+        "deltas",
+        "credit",
+        "mixture_weights",
+        "advantages",
+        "valid_component_mask",
+        "flipgrad_trigger_mask",
+    )
+    merged = {
+        field: [value for packet in rows for value in packet[field]]
+        for field in vector_fields
+    }
+    size = len(merged["deltas"])
+    if any(len(merged[field]) != size for field in vector_fields):
+        raise ValueError("checkpoint probe worker vectors are misaligned")
+
+    trajectory_names = _common_mask_names(rows, "trajectory_masks")
+    position_names = _common_mask_names(rows, "position_masks")
+    output_rows = []
+    for trajectory_name in trajectory_names:
+        trajectory_mask = [
+            value
+            for packet in rows
+            for value in packet["trajectory_masks"][trajectory_name]
+        ]
+        for position_name in position_names:
+            position_mask = [
+                value
+                for packet in rows
+                for value in packet["position_masks"][position_name]
+            ]
+            selected = [
+                bool(valid and trajectory and position)
+                for valid, trajectory, position in zip(
+                    merged["valid_component_mask"], trajectory_mask, position_mask
+                )
+            ]
+            credit = collect_credit_from_values(
+                credit=torch.tensor(merged["credit"]),
+                mixture_weights=torch.tensor(merged["mixture_weights"]),
+                valid_component_mask=torch.tensor(selected),
+                advantages=torch.tensor(merged["advantages"]),
+            )
+            output_rows.append(
+                build_probe_metric_row(
+                    profile_name=profile_name,
+                    seed=seed,
+                    global_step=global_step,
+                    optimizer_step=optimizer_step,
+                    checkpoint_step=checkpoint_step,
+                    probe_batch_id=probe_batch_id,
+                    deltas=merged["deltas"],
+                    valid_delta_mask=selected,
+                    flipgrad_trigger_mask=merged["flipgrad_trigger_mask"],
+                    credit=credit,
+                    trajectory_group=trajectory_name,
+                    latent_position_group=position_name,
+                    probe_rng_restore_succeeded=all(
+                        packet["state_preservation"][field]
+                        for packet in rows
+                        for field in (
+                            "cpu_rng_restored",
+                            "cuda_rng_restored",
+                            "python_rng_restored",
+                            "numpy_rng_restored",
+                        )
+                    ),
+                )
+            )
+
+    state = {
+        field: all(packet["state_preservation"][field] for packet in rows)
+        for field in _STATE_PRESERVATION_FIELDS
+    }
+    benchmark = build_probe_benchmark_row(
+        profile_name=profile_name,
+        seed=seed,
+        global_step=global_step,
+        checkpoint_step=checkpoint_step,
+        probe_batch_id=probe_batch_id,
+        probe_trajectory_count=sum(int(packet["trajectory_count"]) for packet in rows),
+        probe_latent_position_count=sum(int(packet["latent_position_count"]) for packet in rows),
+        credit_autograd_executed=all(
+            packet.get("credit_autograd_executed") is True for packet in rows
+        ),
+        probe_rng_restore_succeeded=all(
+            state[field]
+            for field in (
+                "cpu_rng_restored",
+                "cuda_rng_restored",
+                "python_rng_restored",
+                "numpy_rng_restored",
+            )
+        ),
+        probe_extra_time_seconds=sum(float(packet["probe_extra_time_seconds"]) for packet in rows),
+        probe_peak_memory_bytes=max(int(packet["probe_peak_memory_bytes"]) for packet in rows),
+        record_available=all(state.values()),
+        record_unavailable_reason=None if all(state.values()) else "state_preservation_failed",
+        state_preservation=state,
+    )
+    return {"rows": output_rows, "benchmark": benchmark}
+
+
+def _common_mask_names(packets: Sequence[dict[str, object]], field: str) -> list[str]:
+    names = set(packets[0][field])
+    if any(set(packet[field]) != names for packet in packets[1:]):
+        raise ValueError(f"checkpoint probe {field} differ across workers")
+    return ["all", *sorted(names - {"all"})]
+
+
+def _parameter_token(parameters: Sequence[Any]) -> tuple[object, ...]:
+    return tuple(
+        (id(parameter), int(parameter._version), tuple(parameter.shape), str(parameter.dtype))
+        for parameter in parameters
+    )
+
+
+def _grad_token(parameters: Sequence[Any]) -> tuple[object, ...]:
+    return tuple(
+        None
+        if parameter.grad is None
+        else (
+            id(parameter.grad),
+            int(parameter.grad._version),
+            tuple(parameter.grad.shape),
+            str(parameter.grad.dtype),
+        )
+        for parameter in parameters
+    )
+
+
+def _optimizer_token(optimizer: Any) -> tuple[object, ...]:
+    state = tuple(
+        sorted(
+            (id(parameter), _nested_version_token(values))
+            for parameter, values in optimizer.state.items()
+        )
+    )
+    groups = tuple(
+        tuple(
+            sorted(
+                (key, _nested_version_token(value))
+                for key, value in group.items()
+                if key != "params"
+            )
+        )
+        for group in optimizer.param_groups
+    )
+    return state, groups
+
+
+def _nested_version_token(value: Any) -> object:
+    if hasattr(value, "_version") and hasattr(value, "shape"):
+        return (id(value), int(value._version), tuple(value.shape), str(value.dtype))
+    if isinstance(value, dict):
+        return tuple(sorted((str(key), _nested_version_token(item)) for key, item in value.items()))
+    if isinstance(value, (list, tuple)):
+        return tuple(_nested_version_token(item) for item in value)
+    return value
+
+
+def _numpy_rng_equal(left: tuple[Any, ...], right: tuple[Any, ...]) -> bool:
+    import numpy as np
+
+    return (
+        left[0] == right[0]
+        and np.array_equal(left[1], right[1])
+        and left[2:] == right[2:]
     )
 
 

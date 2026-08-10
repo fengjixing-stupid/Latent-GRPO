@@ -12,7 +12,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 class ConfigTests(unittest.TestCase):
     def test_all_supported_profiles_parse_and_have_deterministic_hashes(self) -> None:
-        for name in ("smoke", "3gpu-low", "3gpu-high-smoke", "kaggle-t4-monitor"):
+        for name in (
+            "smoke",
+            "3gpu-low",
+            "3gpu-high-smoke",
+            "kaggle-t4-monitor",
+            "kaggle-t4-30-metric",
+        ):
             config = load_config(ROOT / "configs" / f"{name}.yaml", workspace_root=ROOT)
             self.assertEqual(config.profile_name, name)
             self.assertEqual(len(config.config_hash), 64)

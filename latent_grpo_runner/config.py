@@ -17,7 +17,9 @@ class ConfigError(ValueError):
     """Raised when a runner profile is unsafe or internally inconsistent."""
 
 
-SUPPORTED_PROFILES = frozenset({"smoke", "3gpu-low", "3gpu-high-smoke", "kaggle-t4-monitor"})
+SUPPORTED_PROFILES = frozenset(
+    {"smoke", "3gpu-low", "3gpu-high-smoke", "kaggle-t4-monitor", "kaggle-t4-30-metric"}
+)
 _TOP_LEVEL_KEYS = frozenset(
     {
         "schema_version",
@@ -315,6 +317,11 @@ class ResolvedConfig:
             values["trainer.test_freq"] = -1
             values["trainer.save_freq"] = -1
             values["trainer.logger"] = "[console]"
+        elif self.profile_name == "kaggle-t4-30-metric":
+            values["trainer.val_before_train"] = False
+            values["trainer.test_freq"] = -1
+            values["trainer.save_freq"] = 1
+            values["trainer.logger"] = "[console]"
         if self.resume_from is not None:
             values["trainer.resume_mode"] = "resume_path"
             values["trainer.resume_from_path"] = self.resume_from
@@ -588,6 +595,49 @@ def _validate_semantics(config: ResolvedConfig) -> None:
             raise ConfigError("kaggle-t4-monitor requires exactly one overlong-prompt filter worker")
         if config.rollout.gpu_memory_utilization > 0.30:
             raise ConfigError("kaggle-t4-monitor SGLang memory utilization must stay <= 0.30")
+    elif config.profile_name == "kaggle-t4-30-metric":
+        if config.profile_kind != "metric_validation":
+            raise ConfigError("kaggle-t4-30-metric must use profile_kind=metric_validation")
+        if config.hardware.required_gpus != 2:
+            raise ConfigError("kaggle-t4-30-metric requires exactly 2 GPUs")
+        if config.training.pre_backward_monitor_probe or config.training.max_steps != 1:
+            raise ConfigError("kaggle-t4-30-metric requires one real actor update")
+        if config.rollout.dtype not in {"float16", "fp16"}:
+            raise ConfigError("kaggle-t4-30-metric requires FP16 runtime")
+        if config.model.use_remove_padding:
+            raise ConfigError("kaggle-t4-30-metric requires padded SDPA actor path")
+        if config.rollout.attention_backend != "triton":
+            raise ConfigError("kaggle-t4-30-metric requires SGLang Triton attention")
+        if not (
+            config.model.enable_gradient_checkpointing
+            and config.model.actor_param_offload
+            and config.model.actor_optimizer_offload
+            and config.model.ref_param_offload
+        ):
+            raise ConfigError("kaggle-t4-30-metric requires checkpointing and all configured offloads")
+        if (
+            config.batch.prompt_batch != 2
+            or config.batch.rollout_n != 2
+            or config.batch.mini_prompt_batch != 1
+            or config.batch.actor_micro_batch_per_gpu != 1
+            or config.batch.rollout_log_prob_micro_batch_per_gpu != 1
+            or config.batch.ref_log_prob_micro_batch_per_gpu != 1
+            or config.batch.ppo_epochs != 1
+        ):
+            raise ConfigError("kaggle-t4-30-metric requires the fixed minimal validation batch geometry")
+        if config.data.max_prompt_length > 256 or config.data.max_response_length > 32:
+            raise ConfigError("kaggle-t4-30-metric prompt/response limits exceed the T4 budget")
+        if config.data.filter_overlong_prompts is not True or config.data.filter_overlong_prompts_workers != 1:
+            raise ConfigError("kaggle-t4-30-metric requires one overlong-prompt filter worker")
+        if config.rollout.gpu_memory_utilization > 0.25:
+            raise ConfigError("kaggle-t4-30-metric SGLang memory utilization must stay <= 0.25")
+        if not (
+            config.features.metrics_enabled
+            and config.features.support_enabled
+            and config.features.checkpoint_probe_enabled
+            and config.features.credit_probe_enabled
+        ):
+            raise ConfigError("kaggle-t4-30-metric requires all metric feature flags")
     elif config.training.pre_backward_monitor_probe:
         raise ConfigError("pre_backward_monitor_probe is reserved for kaggle-t4-monitor")
     if not config.paths["upstream_repo_path"].is_dir():

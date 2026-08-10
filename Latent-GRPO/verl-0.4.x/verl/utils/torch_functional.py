@@ -130,7 +130,17 @@ def logprobs_from_logits_topk_dirichlet(logits, rollout_topk_ids, rollout_topk_g
     else:
         output = logprobs_from_logits_v2(logits, labels)
     return output
-def logprobs_from_logits_topk_gumbel(logits, rollout_topk_ids, rollout_topk_gumbels, labels, top_p, temperature, inplace_backward=True, advantages=None):
+def logprobs_from_logits_topk_gumbel(
+    logits,
+    rollout_topk_ids,
+    rollout_topk_gumbels,
+    labels,
+    top_p,
+    temperature,
+    inplace_backward=True,
+    advantages=None,
+    return_probe_tensors=False,
+):
     """Latent Gumbel likelihood and FlipGrad proxy using native PyTorch math.
 
     The historical FlashAttention availability guard was unnecessary: this
@@ -154,17 +164,17 @@ def logprobs_from_logits_topk_gumbel(logits, rollout_topk_ids, rollout_topk_gumb
 
     # Use global log-softmax to match SGLang's log-probability calculation.
     full_log_probs = logits_f32.log_softmax(dim=-1)
-    topk_log_probs = full_log_probs.gather(-1, rollout_topk_ids_safe)
-    raw_diff = rollout_topk_gumbels_f32 - topk_log_probs
+    topk_log_probs = full_log_probs.gather(-1, rollout_topk_ids_safe).view(
+        *batch_dim, k_num
+    )
+    raw_diff = rollout_topk_gumbels_f32.view(*batch_dim, k_num) - topk_log_probs
 
     # Standard Gumbel log-probability used for the forward value.
     output_gumbel_std = -raw_diff - (-raw_diff).exp()
 
+    need_flip_mask = torch.zeros_like(raw_diff, dtype=torch.bool)
     if advantages is not None:
-        if advantages.dim() == 1:
-            adv_expanded = advantages.unsqueeze(-1).expand_as(raw_diff)
-        else:
-            adv_expanded = advantages.reshape(-1, 1).expand_as(raw_diff)
+        adv_expanded = advantages.reshape(*batch_dim, 1).expand_as(raw_diff)
         need_flip_mask = (adv_expanded <= 0) & (raw_diff < 0)
         raw_diff_flipped = -raw_diff
         output_gumbel_flipped = -raw_diff_flipped - (-raw_diff_flipped).exp()
@@ -174,7 +184,7 @@ def logprobs_from_logits_topk_gumbel(logits, rollout_topk_ids, rollout_topk_gumb
     else:
         output_gumbel = output_gumbel_std
 
-    output_gumbel = output_gumbel.sum(-1) / k_num
+    output_gumbel = (output_gumbel.sum(-1) / k_num).reshape(-1)
     output_gumbel = output_gumbel.to(logits.dtype)
 
     is_standard_token = (rollout_topk_ids[:, 1:] == -100).all(dim=-1)
@@ -186,8 +196,14 @@ def logprobs_from_logits_topk_gumbel(logits, rollout_topk_ids, rollout_topk_gumb
     full_logprobs = F.log_softmax(logits_scaled_f32, dim=-1)
     output_answer = full_logprobs.gather(-1, labels.unsqueeze(-1)).squeeze(-1)
 
-    output = torch.where(is_standard_token, output_answer, output_gumbel)
-    return output.view(*batch_dim)
+    output = torch.where(is_standard_token, output_answer, output_gumbel).view(*batch_dim)
+    if not return_probe_tensors:
+        return output
+    return output, {
+        "topk_log_probs": topk_log_probs,
+        "raw_diff": raw_diff,
+        "flipgrad_trigger_mask": need_flip_mask,
+    }
 
 def top_p_renorm_logprobs(logits, top_ps):
     """
