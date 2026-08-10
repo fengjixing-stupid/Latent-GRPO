@@ -91,6 +91,18 @@ class ConfigTests(unittest.TestCase):
         self.assertNotEqual(config.config_hash, resumed.config_hash)
         self.assertEqual(config.resume_compatibility_hash, resumed.resume_compatibility_hash)
 
+    def test_credit_probe_requires_checkpoint_probe(self) -> None:
+        config = load_config(ROOT / "configs" / "smoke.yaml", workspace_root=ROOT)
+        self.assertFalse(config.features.credit_probe_enabled)
+        with self.assertRaisesRegex(ConfigError, "requires checkpoint_probe_enabled=true"):
+            config.with_runtime_overrides(credit_probe_enabled=True)
+        enabled = config.with_runtime_overrides(
+            checkpoint_probe_enabled=True,
+            credit_probe_enabled=True,
+        )
+        self.assertTrue(enabled.features.checkpoint_probe_enabled)
+        self.assertTrue(enabled.features.credit_probe_enabled)
+
     def test_unknown_field_is_rejected(self) -> None:
         contents = (ROOT / "configs" / "smoke.yaml").read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory() as temporary_directory:

@@ -63,6 +63,7 @@ from verl.utils.tracking import ValidationGenerationsLogger
 from verl.workers.rollout.async_server import AsyncLLMServerManager
 
 try:
+    from latent_grpo_runner.metrics.support import collect_support_metrics
     from latent_grpo_runner.metrics.p1 import merge_worker_p1_packets
     from latent_grpo_runner.metrics.torch_collectors import (
         collect_driver_p1_statistics,
@@ -76,6 +77,7 @@ try:
     )
 except ImportError:  # The author repository must remain runnable without the external runner.
     attach_stable_ids_to_batch = None
+    collect_support_metrics = None
     collect_driver_p1_statistics = None
     collect_generated_trajectory_lengths = None
     emit_eval_question_facts = None
@@ -1149,6 +1151,7 @@ class RayPPOTrainer:
                     self._latent_grpo_observer is not None
                     and self._latent_grpo_observer.enabled
                 )
+                support_enabled = observer_enabled and os.getenv("LATENT_GRPO_SUPPORT_ENABLED", "0").strip().lower() in {"1", "true", "yes", "on"}
                 step_started_at = time.perf_counter() if observer_enabled else None
                 p1_driver_payload = None
                 p1_driver_compute_time = 0.0
@@ -1434,6 +1437,43 @@ class RayPPOTrainer:
                         )
                         scores_std = [item for _,item in id2stds.items()]
                         metrics.update({"rollout/rewards_std": sum(scores_std)/len(scores_std)})
+
+                    if support_enabled:
+                        if collect_support_metrics is None:
+                            raise RuntimeError("Stage 3 support collector is unavailable")
+                        support_classes = []
+                        raw_correctness = batch.non_tensor_batch.get("acc")
+                        if raw_correctness is not None:
+                            support_classes = [
+                                "correct" if bool(value) else "non_correct"
+                                for value in raw_correctness
+                            ]
+                        response_mask = batch.batch["response_mask"]
+                        lengths = response_mask.sum(dim=-1).clamp_min(1)
+                        mean_old_log_probs = (
+                            (batch.batch["old_log_probs"] * response_mask).sum(dim=-1) / lengths
+                        )
+                        response_lengths = batch.batch["attention_mask"][:, -response_mask.size(1):].sum(dim=-1)
+                        support_rows, support_benchmark = collect_support_metrics(
+                            profile_name=getattr(self._latent_grpo_observer, "profile_name", os.getenv("LATENT_GRPO_OBSERVER_PROFILE_NAME", "unknown")),
+                            seed=int(getattr(self._latent_grpo_observer, "seed", os.getenv("LATENT_GRPO_OBSERVER_SEED", "0"))),
+                            global_step=int(self.global_steps),
+                            optimizer_step_at_observation=int(getattr(self._latent_grpo_observer, "optimizer_step", 0)),
+                            group_ids=[str(value) for value in batch.non_tensor_batch.get("group_id", [])],
+                            trajectory_ids=[int(value) for value in batch.non_tensor_batch.get("trajectory_id", [])],
+                            trajectory_classes=support_classes,
+                            trajectory_mean_old_log_probs=mean_old_log_probs.detach().cpu().tolist(),
+                            is_overlong_or_truncated_by_length=(
+                                response_lengths.detach().cpu() >= response_mask.size(1)
+                            ).tolist(),
+                            response_mask=response_mask,
+                            rollout_topk_ids=batch.batch["rollout_topk_ids"],
+                            old_topk_indices=batch.batch["old_topk_indices"],
+                        )
+                        self._latent_grpo_observer.emit(
+                            "support_metrics",
+                            {"rows": support_rows, "benchmark": support_benchmark},
+                        )
 
                     if observer_enabled:
                         if collect_driver_p1_statistics is None:

@@ -239,6 +239,20 @@ class UpstreamPatchContractTests(unittest.TestCase):
         self.assertNotIn("raw_generated_token_count_forward", fit_source)
         self.assertNotIn("raw_generated_token_count_backward", fit_source)
 
+    def test_support_metrics_are_collected_after_old_log_prob_and_ocp_without_extra_forward(self) -> None:
+        source = _source("verl-0.4.x/verl/trainer/ppo/ray_trainer.py")
+        fit_source = ast.get_source_segment(source, _function(source, "fit"))
+
+        old_log_prob = fit_source.index("old_log_prob = self.actor_rollout_wg.compute_log_prob(batch)")
+        advantage = fit_source.index("batch, id2stds = compute_advantage(", old_log_prob)
+        support = fit_source.index("collect_support_metrics(", advantage)
+        update_actor = fit_source.index("actor_output = self.actor_rollout_wg.update_actor(batch)", support)
+        self.assertLess(old_log_prob, advantage)
+        self.assertLess(advantage, support)
+        self.assertLess(support, update_actor)
+        self.assertIn('os.getenv("LATENT_GRPO_SUPPORT_ENABLED", "0")', fit_source)
+        self.assertEqual(fit_source.count("compute_log_prob(batch)"), 1)
+
     def test_topk_logits_are_concatenated_from_logits_not_ids(self) -> None:
         source = _source("verl-0.4.x/verl/workers/actor/dp_actor.py")
         function_source = ast.get_source_segment(source, _function(source, "compute_log_prob"))

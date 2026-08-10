@@ -112,6 +112,60 @@ class DurableMetricsIntegrationTests(unittest.TestCase):
         self.assertEqual(resumed.writer_checkpoint("train_step_metrics")["committed_part_count"], 2)
         resumed.close()
 
+    def test_support_and_checkpoint_probe_events_write_authoritative_tables(self) -> None:
+        from latent_grpo_runner.metrics.probe import build_probe_benchmark_row, build_probe_metric_row
+        from latent_grpo_runner.metrics.support import collect_support_metrics
+
+        observer = self._observer()
+        observer.start_run()
+        support_rows, support_benchmark = collect_support_metrics(
+            profile_name="smoke",
+            seed=17,
+            global_step=1,
+            optimizer_step_at_observation=0,
+            group_ids=["g"],
+            trajectory_ids=[0],
+            trajectory_classes=["correct"],
+            trajectory_mean_old_log_probs=[-0.1],
+            response_mask=[[True]],
+            rollout_topk_ids=[[[1, 2]]],
+            old_topk_indices=[[[2, 1]]],
+        )
+        observer.emit("support_metrics", {"rows": support_rows, "benchmark": support_benchmark})
+        probe_row = build_probe_metric_row(
+            profile_name="smoke",
+            seed=17,
+            global_step=1,
+            optimizer_step=0,
+            checkpoint_step=1,
+            probe_batch_id="probe-a",
+            deltas=[0.0],
+            valid_delta_mask=[True],
+            flipgrad_trigger_mask=[False],
+            credit=None,
+        )
+        probe_benchmark = build_probe_benchmark_row(
+            profile_name="smoke",
+            seed=17,
+            global_step=1,
+            checkpoint_step=1,
+            probe_batch_id="probe-a",
+            probe_trajectory_count=1,
+            probe_latent_position_count=1,
+            credit_autograd_executed=False,
+            probe_rng_restore_succeeded=True,
+        )
+        observer.emit("checkpoint_probe", {"rows": [probe_row], "benchmark": probe_benchmark})
+
+        support_part = next((self.root / "support_metrics").glob("part-*.parquet"))
+        support_record = JsonBackend().read(support_part)["rows"][0]
+        self.assertEqual(support_record["support/retention_rate"], 1.0)
+        probe_part = next((self.root / "probe_metrics").glob("part-*.parquet"))
+        probe_record = JsonBackend().read(probe_part)["rows"][0]
+        self.assertEqual(probe_record["observation_phase"], "checkpoint_probe")
+        self.assertEqual(probe_record["credit_concentration_unavailable_reason"], "disabled_by_config")
+        observer.close()
+
     def test_resume_requires_matching_sidecar_and_schema(self) -> None:
         from latent_grpo_runner.checkpointing import CheckpointCompatibilityError
         from latent_grpo_runner.metrics.storage import SchemaMismatchError

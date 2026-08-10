@@ -41,7 +41,7 @@ class SchemaTests(unittest.TestCase):
             self.assertEqual(eval_fields[name]["physical_type"], "string")
             self.assertFalse(eval_fields[name]["nullable"])
 
-    def test_manifest_lists_stage12_fields_availability_counts_and_deferred_stage_interfaces(self):
+    def test_manifest_lists_stage12_fields_availability_counts_and_stage34_interfaces(self):
         from latent_grpo_runner.metrics.schemas import schema_manifest
 
         manifest = schema_manifest()
@@ -51,8 +51,8 @@ class SchemaTests(unittest.TestCase):
         self.assertIn("train/policy_loss__available", step_names)
         self.assertIn("train/importance_ratio_count", step_names)
         self.assertNotIn("train/gradient_norm", step_names)
-        self.assertEqual(manifest["stages"]["stage3"]["status"], "deferred")
-        self.assertEqual(manifest["stages"]["stage4"]["status"], "disabled")
+        self.assertEqual(manifest["stages"]["stage3"]["status"], "enabled")
+        self.assertEqual(manifest["stages"]["stage4"]["status"], "checkpoint_probe_enabled")
 
     def test_manifest_covers_gumbel_stage2_families_without_memory_only_mechanism_tensors(self):
         from latent_grpo_runner.metrics.schemas import schema_manifest
@@ -79,13 +79,23 @@ class SchemaTests(unittest.TestCase):
         self.assertNotIn("train/generated_token_count_count", fields)
         self.assertIn("signal/reward_count", fields)
 
-    def test_deferred_runtime_tables_are_still_declared_with_explicit_reason(self):
+    def test_stage34_runtime_tables_have_formal_fields(self):
         from latent_grpo_runner.metrics.schemas import schema_manifest
 
         tables = schema_manifest()["tables"]
-        for name in ("eval_question_results", "eval_clean_topk", "support_metrics", "support_benchmark_metrics", "probe_metrics", "probe_benchmark_metrics"):
+        for name in ("support_metrics", "support_benchmark_metrics", "probe_metrics", "probe_benchmark_metrics"):
+            self.assertNotIn("status", tables[name])
+            self.assertGreater(len(tables[name]["fields"]), 5)
+        support_names = {field["name"] for field in tables["support_metrics"]["fields"]}
+        self.assertIn("support/retention_rate", support_names)
+        self.assertIn("support/top1_retention_rate", support_names)
+        self.assertNotIn("checkpoint_step", support_names)
+        probe_names = {field["name"] for field in tables["probe_metrics"]["fields"]}
+        for name in ("onesided/delta_mean", "onesided/flipgrad_rate", "credit/top1_share",
+                     "credit/weight_credit_spearman", "credit/surrogate_alignment_rate"):
+            self.assertIn(name, probe_names)
+        for name in ("eval_question_results", "eval_clean_topk"):
             self.assertEqual(tables[name]["status"], "target_machine_test_deferred")
-            self.assertIsInstance(tables[name]["deferred_reason"], str)
 
     def test_schema_forbids_tensor_and_gradient_persistence(self):
         from latent_grpo_runner.metrics.schemas import persistent_field_is_allowed

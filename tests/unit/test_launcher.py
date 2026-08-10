@@ -27,7 +27,15 @@ class LauncherTests(unittest.TestCase):
 
         launch(config, run_command=fake_run, environment={"LATENT_GRPO_OBSERVER_ENABLED": "0"})
         self.assertEqual(seen[-1]["LATENT_GRPO_OBSERVER_ENABLED"], "1")
+        self.assertEqual(seen[-1]["LATENT_GRPO_SUPPORT_ENABLED"], "0")
+        self.assertEqual(seen[-1]["LATENT_GRPO_CHECKPOINT_PROBE_ENABLED"], "0")
+        self.assertEqual(seen[-1]["LATENT_GRPO_CREDIT_PROBE_ENABLED"], "0")
         self.assertIn(str(ROOT), seen[-1]["PYTHONPATH"].split(os.pathsep))
+
+        probes = config.with_runtime_overrides(checkpoint_probe_enabled=True, credit_probe_enabled=True)
+        launch(probes, run_command=fake_run, environment={})
+        self.assertEqual(seen[-1]["LATENT_GRPO_CHECKPOINT_PROBE_ENABLED"], "1")
+        self.assertEqual(seen[-1]["LATENT_GRPO_CREDIT_PROBE_ENABLED"], "1")
 
         disabled = config.with_runtime_overrides(metrics_enabled=False)
         launch(disabled, run_command=fake_run, environment={"LATENT_GRPO_OBSERVER_ENABLED": "1"})

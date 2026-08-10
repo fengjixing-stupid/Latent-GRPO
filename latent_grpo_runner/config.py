@@ -377,7 +377,7 @@ class ResolvedConfig:
         updated_paths = dict(self.paths)
         if output_root is not None:
             updated_paths["output_root"] = _resolve_workspace_path(self.workspace_root, str(output_root))
-        return replace(
+        resolved = replace(
             self,
             training=updated_training,
             model=updated_model,
@@ -386,6 +386,8 @@ class ResolvedConfig:
             paths=updated_paths,
             resume_from=(None if resume_from is None else _resolve_workspace_path(self.workspace_root, str(resume_from))),
         )
+        _validate_semantics(resolved)
+        return resolved
 
 
 def load_config(path: str | Path, *, workspace_root: str | Path | None = None) -> ResolvedConfig:
@@ -628,8 +630,8 @@ def _validate_semantics(config: ResolvedConfig) -> None:
         raise ConfigError("max_model_len must cover prompt and response lengths")
     if config.model.latent_end_token_id < 0 or not config.model.latent_end_token:
         raise ConfigError("latent-end token configuration is incomplete")
-    if config.features.credit_probe_enabled:
-        raise ConfigError("credit probe is disabled by default and cannot be enabled in these profiles")
+    if config.features.credit_probe_enabled and not config.features.checkpoint_probe_enabled:
+        raise ConfigError("credit_probe_enabled requires checkpoint_probe_enabled=true")
     if not 0 < config.rollout.gpu_memory_utilization <= 1:
         raise ConfigError("gpu_memory_utilization must be in (0, 1]")
     if not 0 < config.rollout.temperature or not 0 < config.rollout.gumbel_softmax_temperature:

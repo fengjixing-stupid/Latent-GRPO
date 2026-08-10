@@ -29,7 +29,14 @@ from latent_grpo_runner.metrics.storage import AppendOnlyPartWriter, PartBackend
 _METRICS_SCHEMA_VERSION = "metrics_schema_v1"
 _P0_UNAVAILABLE_REASON = "p1_metric_collectors_not_integrated"
 _CHECKPOINT_SIDECAR_NAME = "latent_grpo_metrics_sidecar.json"
-_WRITER_TABLES = ("train_step_metrics", "train_group_metrics")
+_WRITER_TABLES = (
+    "train_step_metrics",
+    "train_group_metrics",
+    "support_metrics",
+    "support_benchmark_metrics",
+    "probe_metrics",
+    "probe_benchmark_metrics",
+)
 
 
 class ObserverIntegrationError(RuntimeError):
@@ -156,6 +163,12 @@ class DurableMetricsObserver:
             return
         if event_type == "pre_backward_probe":
             self._commit_train_step(facts, observation_phase="pre_backward_probe")
+            return
+        if event_type == "support_metrics":
+            self._commit_metric_rows(facts, rows_table="support_metrics", benchmark_table="support_benchmark_metrics")
+            return
+        if event_type == "checkpoint_probe":
+            self._commit_metric_rows(facts, rows_table="probe_metrics", benchmark_table="probe_benchmark_metrics")
             return
 
         # These existing hooks are intentionally accepted at P0 so enabling the
@@ -319,6 +332,19 @@ class DurableMetricsObserver:
             )
         self._writers["train_step_metrics"].append([row])
         self._optimizer_step = next_optimizer_step
+
+    def _commit_metric_rows(
+        self, facts: Mapping[str, object], *, rows_table: str, benchmark_table: str
+    ) -> None:
+        rows = facts.get("rows")
+        benchmark = facts.get("benchmark")
+        if not isinstance(rows, list) or not all(isinstance(row, Mapping) for row in rows):
+            raise ObserverIntegrationError(f"{rows_table} event requires a list of row mappings")
+        if not isinstance(benchmark, Mapping):
+            raise ObserverIntegrationError(f"{benchmark_table} event requires one benchmark mapping")
+        if rows:
+            self._writers[rows_table].append([dict(row) for row in rows])
+        self._writers[benchmark_table].append([dict(benchmark)])
 
     def _p0_unavailable_train_step_row(
         self, *, global_step: int, optimizer_step: int, aggregation_worker_count: int

@@ -2,6 +2,13 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-10 · 完成 Stage 3/4 指标采集本地实现
+
+- 新增 Stage 3 Support collector，复用 `rollout_topk_ids` 与 pre-update `old_topk_indices`，严格 shape/K/identity fail-closed。
+- 新增 Stage 4 checkpoint probe reducers：one-sided delta 统计、credit autograd concentration/Spearman/alignment、CPU state-preservation guard。
+- Schema/sink 接通 `support_metrics`、`support_benchmark_metrics`、`probe_metrics`、`probe_benchmark_metrics`；Support trainer hook 由 `LATENT_GRPO_SUPPORT_ENABLED` gated。
+- 本地 CPU 单元测试通过；Kaggle 2xT4 与 3-GPU Stage 3/4 runtime validation 仍为 TARGET_RUNTIME_REQUIRED。
+
 ## 2026-08-10 · 新增 raw generated token 训练指标
 
 - 根据附件规范新增 `train/raw_generated_token_count`，保持 `train/generated_token_count` 的 final-training-rollout 语义不变。

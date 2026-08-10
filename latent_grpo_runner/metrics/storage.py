@@ -96,6 +96,7 @@ _PRIMARY_KEYS = {
     "train_step_metrics": ("profile_name", "seed", "global_step"),
     "train_group_metrics": ("profile_name", "seed", "global_step", "group_id"),
     "support_metrics": ("profile_name", "seed", "global_step", "group_id", "trajectory_id", "trajectory_class"),
+    "support_benchmark_metrics": ("profile_name", "seed", "global_step"),
     "probe_metrics": ("profile_name", "seed", "checkpoint_step", "probe_batch_id", "trajectory_group", "latent_position_group"),
     "probe_benchmark_metrics": ("profile_name", "seed", "checkpoint_step", "probe_batch_id"),
     "gumbel_diagnostics": ("profile_name", "seed", "diagnostic_run_id", "diagnostic_batch_index"),

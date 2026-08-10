@@ -80,6 +80,9 @@ def launch(
     runtime_environment["LATENT_GRPO_OBSERVER_PROFILE_NAME"] = config.profile_name
     runtime_environment["LATENT_GRPO_OBSERVER_SEED"] = str(config.training.seed)
     runtime_environment["LATENT_GRPO_OBSERVER_CONFIG_HASH"] = config.resume_compatibility_hash
+    runtime_environment["LATENT_GRPO_SUPPORT_ENABLED"] = "1" if config.features.support_enabled else "0"
+    runtime_environment["LATENT_GRPO_CHECKPOINT_PROBE_ENABLED"] = "1" if config.features.checkpoint_probe_enabled else "0"
+    runtime_environment["LATENT_GRPO_CREDIT_PROBE_ENABLED"] = "1" if config.features.credit_probe_enabled else "0"
     if config.features.metrics_enabled:
         workspace_root = str(Path(__file__).resolve().parents[1])
         existing_pythonpath = runtime_environment.get("PYTHONPATH", "")
