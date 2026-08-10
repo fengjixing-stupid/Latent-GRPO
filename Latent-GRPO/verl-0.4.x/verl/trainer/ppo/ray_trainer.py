@@ -64,7 +64,10 @@ from verl.workers.rollout.async_server import AsyncLLMServerManager
 
 try:
     from latent_grpo_runner.metrics.probe import build_checkpoint_probe_event
-    from latent_grpo_runner.metrics.support import collect_support_metrics
+    from latent_grpo_runner.metrics.support import (
+        collect_support_metrics,
+        trajectory_classes_from_rewards,
+    )
     from latent_grpo_runner.metrics.p1 import merge_worker_p1_packets
     from latent_grpo_runner.metrics.torch_collectors import (
         collect_driver_p1_statistics,
@@ -80,6 +83,7 @@ except ImportError:  # The author repository must remain runnable without the ex
     attach_stable_ids_to_batch = None
     build_checkpoint_probe_event = None
     collect_support_metrics = None
+    trajectory_classes_from_rewards = None
     collect_driver_p1_statistics = None
     collect_generated_trajectory_lengths = None
     emit_eval_question_facts = None
@@ -1454,15 +1458,9 @@ class RayPPOTrainer:
                         metrics.update({"rollout/rewards_std": sum(scores_std)/len(scores_std)})
 
                     if support_enabled:
-                        if collect_support_metrics is None:
+                        if collect_support_metrics is None or trajectory_classes_from_rewards is None:
                             raise RuntimeError("Stage 3 support collector is unavailable")
-                        support_classes = []
-                        raw_correctness = batch.non_tensor_batch.get("acc")
-                        if raw_correctness is not None:
-                            support_classes = [
-                                "correct" if bool(value) else "non_correct"
-                                for value in raw_correctness
-                            ]
+                        support_classes = trajectory_classes_from_rewards(batch.batch["token_level_scores"])
                         response_mask = batch.batch["response_mask"]
                         lengths = response_mask.sum(dim=-1).clamp_min(1)
                         mean_old_log_probs = (

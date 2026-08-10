@@ -252,6 +252,9 @@ class UpstreamPatchContractTests(unittest.TestCase):
         self.assertLess(support, update_actor)
         self.assertIn('os.getenv("LATENT_GRPO_SUPPORT_ENABLED", "0")', fit_source)
         self.assertEqual(fit_source.count("compute_log_prob(batch)"), 1)
+        support_block = fit_source[advantage:support]
+        self.assertIn('trajectory_classes_from_rewards(batch.batch["token_level_scores"])', support_block)
+        self.assertNotIn('batch.non_tensor_batch.get("acc")', support_block)
 
     def test_topk_logits_are_concatenated_from_logits_not_ids(self) -> None:
         source = _source("verl-0.4.x/verl/workers/actor/dp_actor.py")

@@ -3,6 +3,40 @@ import unittest
 
 
 class Stage3SupportTests(unittest.TestCase):
+    def test_trajectory_classes_are_built_from_eight_binary_sequence_rewards(self) -> None:
+        from latent_grpo_runner.metrics.support import trajectory_classes_from_rewards
+
+        classes = trajectory_classes_from_rewards([
+            [0.0, 1.0],
+            [0.0, 0.0],
+            [1.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 1.0],
+            [0.0, 0.0],
+            [1.0, 0.0],
+        ])
+
+        self.assertEqual(
+            classes,
+            [
+                "correct",
+                "non_correct",
+                "correct",
+                "non_correct",
+                "non_correct",
+                "correct",
+                "non_correct",
+                "correct",
+            ],
+        )
+
+    def test_trajectory_classes_reject_nonbinary_sequence_rewards(self) -> None:
+        from latent_grpo_runner.metrics.support import trajectory_classes_from_rewards
+
+        with self.assertRaisesRegex(ValueError, "binary sequence rewards"):
+            trajectory_classes_from_rewards([[0.0, 0.5], [0.0, 1.0]])
+
     def test_support_retention_handles_full_partial_none_and_top1_membership(self) -> None:
         from latent_grpo_runner.metrics.support import collect_support_metrics
 

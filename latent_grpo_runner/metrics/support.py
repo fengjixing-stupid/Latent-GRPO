@@ -12,6 +12,32 @@ SUPPORT_RECORD_VERSION = "support_metrics_v1"
 SUPPORT_SELECTION_RULE_VERSION = "support_selection_v1"
 
 
+def trajectory_classes_from_rewards(token_level_scores: Any) -> list[str]:
+    """Classify trajectories from the existing binary sequence rewards."""
+    if hasattr(token_level_scores, "detach"):
+        values = token_level_scores.detach()
+        if getattr(values, "ndim", None) != 2:
+            raise ValueError("support correctness requires rank-2 token rewards")
+        sequence_rewards = values.sum(dim=-1).cpu().tolist()
+    else:
+        try:
+            rows = list(token_level_scores)
+            sequence_rewards = [sum(float(value) for value in row) for row in rows]
+        except (TypeError, ValueError) as error:
+            raise ValueError("support correctness requires rank-2 token rewards") from error
+
+    classes = []
+    for reward in sequence_rewards:
+        value = float(reward)
+        if not math.isfinite(value) or not (
+            math.isclose(value, 0.0, abs_tol=1e-6)
+            or math.isclose(value, 1.0, abs_tol=1e-6)
+        ):
+            raise ValueError("support correctness requires binary sequence rewards")
+        classes.append("correct" if math.isclose(value, 1.0, abs_tol=1e-6) else "non_correct")
+    return classes
+
+
 def collect_support_metrics(
     *,
     profile_name: str,
