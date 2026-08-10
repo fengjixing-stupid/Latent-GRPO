@@ -617,7 +617,7 @@ def _validate_semantics(config: ResolvedConfig) -> None:
             raise ConfigError("kaggle-t4-30-metric requires checkpointing and all configured offloads")
         if (
             config.batch.prompt_batch != 2
-            or config.batch.rollout_n != 2
+            or config.batch.rollout_n != 4
             or config.batch.mini_prompt_batch != 1
             or config.batch.actor_micro_batch_per_gpu != 1
             or config.batch.rollout_log_prob_micro_batch_per_gpu != 1

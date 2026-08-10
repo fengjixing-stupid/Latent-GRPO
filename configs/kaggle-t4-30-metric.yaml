@@ -9,7 +9,7 @@ target_hardware:
   min_vram_gb: 14
 batch:
   prompt_batch: 2
-  rollout_n: 2
+  rollout_n: 4
   mini_prompt_batch: 1
   actor_micro_batch_per_gpu: 1
   rollout_log_prob_micro_batch_per_gpu: 1
@@ -54,7 +54,7 @@ rollout:
 training:
   max_steps: 1
   seed: 17
-  filter_groups_max_num_gen_batches: 5
+  filter_groups_max_num_gen_batches: 10
   pre_backward_monitor_probe: false
 paths:
   upstream_repo_path: Latent-GRPO
