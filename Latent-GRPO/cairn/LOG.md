@@ -2,6 +2,12 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-11 · 提高 Kaggle 2xT4 动态过滤采样成功率
+
+- Kaggle 实跑确认旧 `rollout_n=2` 在 5 批生成内未产生奖励有方差的 prompt group，训练按设计在 dynamic filtering 阶段 fail-closed。
+- 仅调整 30 指标验证 profile 为 `rollout_n=4`、`filter_groups_max_num_gen_batches=10`；reward、GRPO advantage 和 dynamic filtering 实现保持不变。
+- 新运行时提交为 `1ab101c85ef1a75d1ed99011edbd0ca32ca68b87`，30 指标 notebook 已重新固定该 SHA。
+
 ## 2026-08-11 · 接通 Kaggle 2xT4 30 指标正式 runtime
 
 - 新增 `kaggle-t4-30-metric` 一步真实更新 profile，启用 Stage 1-3 passive instrumentation、checkpoint-only Stage 4 和 Credit autograd。

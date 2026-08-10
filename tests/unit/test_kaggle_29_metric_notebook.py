@@ -6,7 +6,7 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 NOTEBOOK = ROOT / "Latent_GRPO_Kaggle_2xT4_30_Metric_Runtime_Validation.ipynb"
-EXPECTED_COMMIT = "76c09fc8e45f57ad7c487ed0532e3994f38b53f2"
+EXPECTED_COMMIT = "1ab101c85ef1a75d1ed99011edbd0ca32ca68b87"
 
 CORE_METRICS = (
     "train/policy_loss",
