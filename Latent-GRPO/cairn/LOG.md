@@ -2,6 +2,12 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-11 · 排除 masked token 的 PPO 数值污染
+
+- Kaggle 双 T4 实证 195 个有效 response token 的 policy/KL/ratio count 均完整，但上游 `pg_loss`、`ppo_kl`、`grad_norm` 为 NaN；根因为 padding 非有限值经 `NaN * 0` 污染 masked reduction。
+- Gumbel likelihood 现于非线性运算前清理 invalid 行，PPO 于 ratio/clipping 前清理 masked log-prob 与 advantage；masked 输出及梯度严格为零，有效 token 数值与梯度保持不变。
+- 修复运行时提交为 `ebae7957cdb64e256212179b4177df22b0a3e5d6`；CPU 回归覆盖 masked `NaN/+Inf/-Inf`、Gumbel、PPO 和通用 masked mean。
+
 ## 2026-08-11 · 对齐 Stage 3 response Top-K 域
 
 - Kaggle `support_benchmark_metrics` 实证第二个 Stage 3 阻塞为 `response_width_mismatch`：mask 仅覆盖 response，而 rollout/old Top-K 仍携带不同长度的 prompt 前缀。
