@@ -2,6 +2,13 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-11 · Kaggle 指标验证使用轻量 checkpoint
+
+- Kaggle 实证 FSDP `actor_rollout_save_checkpoint` 因同时构造 model/optimizer CPU state dict 触发 Ray `NODE_OUT_OF_MEMORY`；磁盘仍余 12 GB，输出目录仅 360 KB。
+- `kaggle-t4-30-metric` 现保存 model shard、scheduler/RNG extra 和 observer sidecar，不序列化 optimizer，并明确禁止 resume；其他 profile 的完整 checkpoint 默认不变。
+- FSDP manager 按 `checkpoint.contents` 条件保存/加载，保存时逐组件写入并立即释放；最终 gate 仍要求五张正式指标表和 `CORE METRICS: 29 / 29`。
+- 修复运行时提交为 `aa26ea0a038b7e70fbf8add0f2d4fcd2c3c25651`；真实双 T4 指标完整性需 Kaggle 重新 Run All。
+
 ## 2026-08-11 · 撤回 Kaggle CUDA allocator 强制配置
 
 - Kaggle 实证 `expandable_segments:True` 使 SGLang 权重同步进入 CUDA IPC 重建，并因容器拒绝 `pidfd_getfd` 而在首个 rollout 前失败；该错误不是 OOM。
