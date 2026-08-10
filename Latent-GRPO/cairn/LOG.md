@@ -8,7 +8,8 @@
 - Gumbel likelihood 可选暴露真实图上的 Top-K log-prob/raw delta；worker 每 rank 仅调用一次 `torch.autograd.grad`，随后保持原训练 `loss.backward()`/optimizer 路径。
 - Driver 在 checkpoint 保存前聚合有界 detached probe packet，写入正式 `probe_metrics`/`probe_benchmark_metrics`，并将状态保护证据纳入 schema。
 - 新增双 T4 正式 runner 和 29 core + raw token validator；本地 dry-run 与 CPU 单元测试通过，真实 CUDA/Ray/SGLang 执行仍待 Kaggle。
-- Notebook 生成器已改用单一正式 runner，但最终 notebook 需要这些改动 commit/push 后才能绑定远端精确 SHA。
+- 运行时已发布为 `76c09fc8e45f57ad7c487ed0532e3994f38b53f2`；30 指标 notebook 固定该 SHA，并随 `bb2c1fd` 发布到 `main`。
+- 本地单元测试、notebook 语法和静态契约已通过；真实 CUDA/Ray/SGLang 结果仍需 Kaggle 2xT4 Run All 生成。
 
 ## 2026-08-10 · 生成 Kaggle 2xT4 29 指标验证 Notebook
 
