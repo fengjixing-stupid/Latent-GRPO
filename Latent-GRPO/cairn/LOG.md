@@ -2,6 +2,12 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-11 · 对齐 Stage 3 response Top-K 域
+
+- Kaggle `support_benchmark_metrics` 实证第二个 Stage 3 阻塞为 `response_width_mismatch`：mask 仅覆盖 response，而 rollout/old Top-K 仍携带不同长度的 prompt 前缀。
+- Support collector 现从 `response_mask` 动态取得宽度，对两份已有 Top-K 取 response 后缀；任一输入不足该宽度仍 fail-closed，不硬编码 32。
+- 修复运行时提交为 `fffe2735887eda6a55688088ba3505088e2304e0`；本地测试覆盖不同前缀长度和不足宽度拒绝路径。
+
 ## 2026-08-11 · 修复 Stage 3 GSM8K 轨迹分类来源
 
 - Kaggle `support_benchmark_metrics` 实证 `identity_vector_length_mismatch`：正式 batch 有 8 条轨迹，但 scalar GSM8K reward 不产生可选 `acc` extra-info，导致分类标签为空。
