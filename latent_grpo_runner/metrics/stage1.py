@@ -31,6 +31,7 @@ def build_train_step_metrics(
     statistics: Mapping[str, SufficientStats],
     final_training_trajectory_lengths: Iterable[int],
     *,
+    raw_generation_trajectory_lengths: Optional[Iterable[int]] = None,
     driver_step_time_seconds: Optional[float] = None,
     stage2_statistics: Optional["Stage2SufficientStats"] = None,
     aggregation_worker_count: Optional[int] = None,
@@ -50,6 +51,9 @@ def build_train_step_metrics(
     lengths = list(final_training_trajectory_lengths)
     if any(not isinstance(length, int) or length < 0 for length in lengths):
         raise ValueError("trajectory lengths must be non-negative integers")
+    raw_lengths = None if raw_generation_trajectory_lengths is None else list(raw_generation_trajectory_lengths)
+    if raw_lengths is not None and any(not isinstance(length, int) or length < 0 for length in raw_lengths):
+        raise ValueError("raw generation trajectory lengths must be non-negative integers")
     record = context.to_record()
     record.update({
         "metric_scope": "train_step", "aggregation_worker_count": aggregation_worker_count,
@@ -57,6 +61,8 @@ def build_train_step_metrics(
         "metrics_write_time": metrics_write_time,
         "generated_token_count_definition_version": "paper_mixed_trajectory_sum_v1",
         "generated_token_count_scope": "final_training_rollout_trajectories",
+        "raw_generated_token_count_definition_version": "paper_mixed_trajectory_sum_v1",
+        "raw_generated_token_count_scope": "all_rollout_generation_attempts",
         "entropy_source": "runtime_policy_entropy", "entropy_probability_space": "runtime_policy_distribution",
         "entropy_mask_definition": "runtime_policy_entropy_mask", "entropy_definition_version": "runtime_policy_entropy_v1",
         "response_length_definition_version": "runtime_response_length_v1",
@@ -76,6 +82,14 @@ def build_train_step_metrics(
     record["train/generated_token_count"] = sum(lengths) if generated_available else None
     record["train/generated_token_count__available"] = generated_available
     record["train/generated_token_count__unavailable_reason"] = None if generated_available else "empty_effective_mask"
+    raw_available = bool(raw_lengths)
+    record["train/raw_generated_token_count"] = sum(raw_lengths) if raw_available else None
+    record["train/raw_generated_token_count__available"] = raw_available
+    record["train/raw_generated_token_count__unavailable_reason"] = (
+        None
+        if raw_available
+        else ("missing_runtime_interface" if raw_lengths is None else "empty_effective_mask")
+    )
     record["final_training_trajectory_count"] = len(lengths)
     time_available = driver_step_time_seconds is not None and math.isfinite(float(driver_step_time_seconds))
     if is_pre_backward_probe and time_available:
@@ -91,7 +105,7 @@ def build_train_step_metrics(
             else "missing_runtime_interface"
         )
     )
-    all_available = all_available and generated_available and time_available
+    all_available = all_available and generated_available and raw_available and time_available
     from .stage2 import Stage2SufficientStats, build_stage2_metrics
     if stage2_statistics is None:
         stage2_statistics = Stage2SufficientStats(

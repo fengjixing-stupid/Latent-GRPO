@@ -64,7 +64,10 @@ from verl.workers.rollout.async_server import AsyncLLMServerManager
 
 try:
     from latent_grpo_runner.metrics.p1 import merge_worker_p1_packets
-    from latent_grpo_runner.metrics.torch_collectors import collect_driver_p1_statistics
+    from latent_grpo_runner.metrics.torch_collectors import (
+        collect_driver_p1_statistics,
+        collect_generated_trajectory_lengths,
+    )
     from latent_grpo_runner.upstream_adapter import (
         attach_stable_ids_to_batch,
         emit_eval_question_facts,
@@ -74,6 +77,7 @@ try:
 except ImportError:  # The author repository must remain runnable without the external runner.
     attach_stable_ids_to_batch = None
     collect_driver_p1_statistics = None
+    collect_generated_trajectory_lengths = None
     emit_eval_question_facts = None
     load_observer_from_env = None
     merge_worker_observer_packets = None
@@ -1109,16 +1113,20 @@ class RayPPOTrainer:
         acc_batch = None
         num_prompt_in_batch = 0
         num_gen_batches = 0
+        raw_generated_trajectory_lengths = []
 
         for epoch in range(self.config.trainer.total_epochs):
             # Clear accumulated samples from previous epoch
             acc_batch = None
             num_prompt_in_batch = 0
             num_gen_batches = 0
+            raw_generated_trajectory_lengths = []
         
             for batch_dict in self.train_dataloader:
                 metrics = {}
                 timing_raw = {}
+                if acc_batch is None and num_prompt_in_batch == 0 and num_gen_batches == 0:
+                    raw_generated_trajectory_lengths = []
                 batch: DataProto = DataProto.from_single_dict(batch_dict)
 
                 # pop those keys for generation
@@ -1154,6 +1162,12 @@ class RayPPOTrainer:
                             self.async_rollout_manager.wake_up()
                             gen_batch_output = self.async_rollout_manager.generate_sequences(gen_batch)
                             self.async_rollout_manager.sleep()
+                        if observer_enabled:
+                            if collect_generated_trajectory_lengths is None:
+                                raise RuntimeError("P1 raw generation token collector is unavailable")
+                            raw_generated_trajectory_lengths.extend(
+                                collect_generated_trajectory_lengths(gen_batch_output)
+                            )
 
                     if self.config.algorithm.adv_estimator == AdvantageEstimator.REMAX:
                         with _timer("gen_max", timing_raw):
@@ -1480,6 +1494,7 @@ class RayPPOTrainer:
                             actor_update_event.update(
                                 {
                                     "global_step": int(self.global_steps),
+                                    "raw_generated_trajectory_lengths": list(raw_generated_trajectory_lengths),
                                     "observation_phase": (
                                         "pre_backward_probe"
                                         if pre_backward_monitor_probe

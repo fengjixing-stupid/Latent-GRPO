@@ -107,6 +107,7 @@ class P1AggregationTests(unittest.TestCase):
             worker_statistics=merged["p1_worker_sufficient_stats"],
             driver_statistics=driver,
             final_training_trajectory_lengths=[2, 3, 4],
+            raw_generated_trajectory_lengths=[2, 3, 4, 5],
             driver_step_time_seconds=1.25,
             aggregation_worker_count=2,
         )
@@ -116,6 +117,7 @@ class P1AggregationTests(unittest.TestCase):
         self.assertAlmostEqual(row["train/policy_loss"], 13 / 3)
         self.assertAlmostEqual(row["train/clip_fraction"], 2 / 3)
         self.assertEqual(row["train/generated_token_count"], 9)
+        self.assertEqual(row["train/raw_generated_token_count"], 14)
         self.assertEqual(row["final_training_trajectory_count"], 3)
         self.assertAlmostEqual(row["mask/zero_advantage_rate"], 0.5)
         self.assertEqual(row["aggregation_worker_count"], 2)

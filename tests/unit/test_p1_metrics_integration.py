@@ -73,6 +73,7 @@ class P1DurableIntegrationTests(unittest.TestCase):
                     "p1_driver_metrics_available": True,
                     "p1_driver_sufficient_stats": driver,
                     "final_training_trajectory_lengths": [2, 3],
+                    "raw_generated_trajectory_lengths": [2, 3, 4],
                     "driver_step_time_seconds": 1.5,
                     "metrics_compute_time": 0.01,
                     "learning_rate": 1e-6,
@@ -86,6 +87,7 @@ class P1DurableIntegrationTests(unittest.TestCase):
             self.assertTrue(row["stage2_available"])
             self.assertEqual(row["record_version"], "metrics_record_p1_v1")
             self.assertEqual(row["train/generated_token_count"], 5)
+            self.assertEqual(row["train/raw_generated_token_count"], 9)
             self.assertAlmostEqual(row["train/policy_loss"], 1.5)
             self.assertAlmostEqual(row["train/clip_fraction"], 0.5)
             self.assertEqual(row["optimizer_step"], 1)

@@ -264,11 +264,14 @@ class DurableMetricsObserver:
             worker_statistics = facts.get("p1_worker_sufficient_stats")
             driver_statistics = facts.get("p1_driver_sufficient_stats")
             trajectory_lengths = facts.get("final_training_trajectory_lengths")
+            raw_generated_lengths = facts.get("raw_generated_trajectory_lengths")
             step_time = facts.get("driver_step_time_seconds")
             if not isinstance(worker_statistics, Mapping) or not isinstance(driver_statistics, Mapping):
                 raise ObserverIntegrationError("P1 sufficient statistics must be mappings")
             if not isinstance(trajectory_lengths, (list, tuple)):
                 raise ObserverIntegrationError("P1 final trajectory lengths must be a sequence")
+            if not isinstance(raw_generated_lengths, (list, tuple)):
+                raise ObserverIntegrationError("P1 raw generated trajectory lengths must be a sequence")
             if observation_phase == "post_update" and type(step_time) not in {int, float}:
                 raise ObserverIntegrationError("P1 post-update driver step time must be numeric")
             if observation_phase == "pre_backward_probe" and step_time is not None:
@@ -293,6 +296,7 @@ class DurableMetricsObserver:
                     worker_statistics=worker_statistics,
                     driver_statistics=driver_statistics,
                     final_training_trajectory_lengths=trajectory_lengths,
+                    raw_generated_trajectory_lengths=raw_generated_lengths,
                     driver_step_time_seconds=(
                         None if step_time is None else float(step_time)
                     ),

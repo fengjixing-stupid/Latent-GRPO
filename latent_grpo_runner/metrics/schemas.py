@@ -65,9 +65,10 @@ def schema_manifest() -> dict:
         ("train/clip_fraction", "clip_fraction"), ("train/importance_ratio_mean", "importance_ratio"),
         ("train/importance_ratio_std", "importance_ratio"), ("train/response_length", "response_length"),
         ("train/latent_length", "latent_length"), ("train/generated_token_count", "generated_token_count"),
+        ("train/raw_generated_token_count", "raw_generated_token_count"),
         ("train/step_time", "step_time"),
     ]:
-        step.extend(_observed_metric(name, 1, family, "int64" if name == "train/generated_token_count" else "float64"))
+        step.extend(_observed_metric(name, 1, family, "int64" if name in {"train/generated_token_count", "train/raw_generated_token_count"} else "float64"))
     step.extend([_field(name, "int64", 1, nullable=False, family=family) for name, family in [
         ("train/policy_loss_count", "policy_loss"), ("train/entropy_count", "entropy"), ("train/kl_count", "kl"),
         ("train/clip_fraction_count", "clip_fraction"), ("train/importance_ratio_count", "importance_ratio"),
@@ -75,7 +76,8 @@ def schema_manifest() -> dict:
         ("final_training_trajectory_count", "generated_token_count"),
     ]])
     step.extend([_field(name, "string", 1) for name in [
-        "generated_token_count_definition_version", "generated_token_count_scope", "entropy_source",
+        "generated_token_count_definition_version", "generated_token_count_scope",
+        "raw_generated_token_count_definition_version", "raw_generated_token_count_scope", "entropy_source",
         "entropy_probability_space", "entropy_mask_definition", "entropy_definition_version",
         "response_length_definition_version", "latent_length_definition_version", "length_counting_rule_version",
     ]])

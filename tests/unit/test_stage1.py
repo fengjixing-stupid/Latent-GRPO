@@ -24,12 +24,63 @@ class Stage1Tests(unittest.TestCase):
         }
         self.assertTrue(core.issubset(row))
         self.assertEqual(row["train/generated_token_count"], 15)
+        self.assertIsNone(row["train/raw_generated_token_count"])
         self.assertEqual(row["generated_token_count_scope"], "final_training_rollout_trajectories")
         self.assertEqual(row["entropy_source"], "runtime_policy_entropy")
         self.assertIn("entropy_probability_space", row)
         self.assertIn("entropy_mask_definition", row)
         self.assertIn("entropy_definition_version", row)
         self.assertNotIn("train/gradient_norm", row)
+
+    def test_raw_generated_token_count_equals_final_count_without_filtering_or_retry(self):
+        from latent_grpo_runner.metrics.events import StepContext
+        from latent_grpo_runner.metrics.stage1 import build_train_step_metrics
+
+        row = build_train_step_metrics(
+            StepContext("smoke", 1, 4, 3, "post_update"),
+            {},
+            [3, 2],
+            raw_generation_trajectory_lengths=[3, 2],
+            driver_step_time_seconds=0.5,
+        )
+
+        self.assertEqual(row["train/generated_token_count"], 5)
+        self.assertEqual(row["train/raw_generated_token_count"], 5)
+        self.assertTrue(row["train/raw_generated_token_count__available"])
+        self.assertEqual(row["raw_generated_token_count_scope"], "all_rollout_generation_attempts")
+
+    def test_raw_generated_token_count_includes_discarded_and_retry_attempts(self):
+        from latent_grpo_runner.metrics.events import StepContext
+        from latent_grpo_runner.metrics.stage1 import build_train_step_metrics
+
+        row = build_train_step_metrics(
+            StepContext("smoke", 1, 4, 3, "post_update"),
+            {},
+            [3, 2],
+            raw_generation_trajectory_lengths=[3, 2, 4, 1],
+            driver_step_time_seconds=0.5,
+        )
+
+        self.assertEqual(row["train/generated_token_count"], 5)
+        self.assertEqual(row["train/raw_generated_token_count"], 10)
+        self.assertGreater(row["train/raw_generated_token_count"], row["train/generated_token_count"])
+
+    def test_empty_raw_generation_domain_is_unavailable_independently(self):
+        from latent_grpo_runner.metrics.events import StepContext
+        from latent_grpo_runner.metrics.stage1 import build_train_step_metrics
+
+        row = build_train_step_metrics(
+            StepContext("smoke", 1, 4, 3, "post_update"),
+            {},
+            [3],
+            raw_generation_trajectory_lengths=[],
+            driver_step_time_seconds=0.5,
+        )
+
+        self.assertEqual(row["train/generated_token_count"], 3)
+        self.assertIsNone(row["train/raw_generated_token_count"])
+        self.assertFalse(row["train/raw_generated_token_count__available"])
+        self.assertEqual(row["train/raw_generated_token_count__unavailable_reason"], "empty_effective_mask")
 
     def test_step_time_uses_driver_whole_step_clock_not_worker_average(self):
         from latent_grpo_runner.metrics.aggregators import SufficientStats

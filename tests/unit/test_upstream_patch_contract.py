@@ -218,6 +218,27 @@ class UpstreamPatchContractTests(unittest.TestCase):
         latest_index = save_source.index("latest_checkpointed_iteration.txt")
         self.assertLess(sidecar_index, latest_index)
 
+    def test_raw_generated_tokens_are_collected_immediately_after_each_real_generation_attempt(self) -> None:
+        source = _source("verl-0.4.x/verl/trainer/ppo/ray_trainer.py")
+        fit_source = ast.get_source_segment(source, _function(source, "fit"))
+
+        generate = fit_source.index("gen_batch_output = self.actor_rollout_wg.generate_sequences(gen_batch)")
+        raw_collect = fit_source.index("collect_generated_trajectory_lengths(gen_batch_output)", generate)
+        filtering = fit_source.index("if self.config.algorithm.filter_groups.enable", raw_collect)
+        payload = fit_source.index('"raw_generated_trajectory_lengths"', filtering)
+
+        self.assertLess(generate, raw_collect)
+        self.assertLess(raw_collect, filtering)
+        self.assertLess(filtering, payload)
+
+    def test_raw_generated_token_collection_does_not_add_generation_forward_or_backward(self) -> None:
+        source = _source("verl-0.4.x/verl/trainer/ppo/ray_trainer.py")
+        fit_source = ast.get_source_segment(source, _function(source, "fit"))
+
+        self.assertEqual(fit_source.count("collect_generated_trajectory_lengths(gen_batch_output)"), 1)
+        self.assertNotIn("raw_generated_token_count_forward", fit_source)
+        self.assertNotIn("raw_generated_token_count_backward", fit_source)
+
     def test_topk_logits_are_concatenated_from_logits_not_ids(self) -> None:
         source = _source("verl-0.4.x/verl/workers/actor/dp_actor.py")
         function_source = ast.get_source_segment(source, _function(source, "compute_log_prob"))

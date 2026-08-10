@@ -10,6 +10,22 @@ from __future__ import annotations
 from typing import Any
 
 
+def collect_generated_trajectory_lengths(batch: Any) -> list[int]:
+    """Count generated response positions in one real rollout output batch."""
+    import torch
+
+    responses = batch.batch["responses"]
+    attention_mask = batch.batch["attention_mask"].detach().bool()
+    response_width = responses.shape[-1]
+    if attention_mask.dim() != 2 or response_width < 1:
+        raise ValueError("generation output must contain rank-2 attention_mask and responses")
+    if attention_mask.size(1) < response_width:
+        raise ValueError("attention_mask is shorter than the response domain")
+    response_mask = attention_mask[:, -response_width:]
+    lengths = response_mask.sum(dim=-1).to(torch.int64)
+    return [int(value) for value in lengths.tolist()]
+
+
 def sufficient_stats_from_tensor(
     values: Any,
     *,

@@ -173,6 +173,7 @@ def build_p1_train_step_metrics(
     worker_statistics: Mapping[str, Any],
     driver_statistics: Mapping[str, Any],
     final_training_trajectory_lengths: Sequence[int],
+    raw_generated_trajectory_lengths: Sequence[int],
     driver_step_time_seconds: float | None,
     aggregation_worker_count: int,
     metrics_compute_time: float | None = None,
@@ -212,6 +213,7 @@ def build_p1_train_step_metrics(
         context,
         stage1_statistics,
         final_training_trajectory_lengths,
+        raw_generation_trajectory_lengths=raw_generated_trajectory_lengths,
         driver_step_time_seconds=(
             None if driver_step_time_seconds is None else float(driver_step_time_seconds)
         ),

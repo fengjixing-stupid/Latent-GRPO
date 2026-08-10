@@ -47,6 +47,7 @@ class SchemaTests(unittest.TestCase):
         manifest = schema_manifest()
         step_names = {field["name"] for field in manifest["tables"]["train_step_metrics"]["fields"]}
         self.assertIn("train/generated_token_count", step_names)
+        self.assertIn("train/raw_generated_token_count", step_names)
         self.assertIn("train/policy_loss__available", step_names)
         self.assertIn("train/importance_ratio_count", step_names)
         self.assertNotIn("train/gradient_norm", step_names)
@@ -72,6 +73,8 @@ class SchemaTests(unittest.TestCase):
         fields = {field["name"]: field for field in schema_manifest()["tables"]["train_step_metrics"]["fields"]}
         self.assertIn("signal/reward_mean", fields)
         self.assertEqual(fields["train/generated_token_count"]["logical_type"], "int64")
+        self.assertEqual(fields["train/raw_generated_token_count"]["logical_type"], "int64")
+        self.assertNotIn("train/raw_generated_token_count_count", fields)
         self.assertNotIn("stage2_metric_fields", schema_manifest()["tables"])
         self.assertNotIn("train/generated_token_count_count", fields)
         self.assertIn("signal/reward_count", fields)
