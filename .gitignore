@@ -22,6 +22,8 @@ env/
 
 # Training outputs that should not enter Git
 /models/
+/artifacts/validation/
+/artifacts/runs/
 checkpoints/
 outputs/
 wandb/
@@ -29,3 +31,11 @@ wandb/
 # Temporary files
 *.log
 *.tmp
+
+# Target runtime and release-validation evidence
+/.venv-target/
+/.pytest_cache/
+/cache/
+/artifacts/target_machine/
+/release_validation/
+/artifacts/runtime_setup/

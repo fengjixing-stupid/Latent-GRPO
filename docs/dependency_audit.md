@@ -1,5 +1,8 @@
 # Latent-GRPO 依赖与 CUDA 兼容性审计
 
+> **最终包状态（2026-08-11）：** 下文保留的是修复前的依赖审计证据。最终实验包的活动安装路径已经统一为 `flashinfer-python==0.2.5` 与 `sgl-kernel==0.1.1`，由 `scripts/target_machine/03_install_runtime.sh` 安装并执行 `pip check`。不要从下文历史候选值反推当前安装命令。
+
+
 审计日期：2026-08-02。作者仓库 commit：`c0994fb781a2d180662bb522d8ff3e8638dcf56d`。本审计基于仓库静态证据、官方上游元数据和当前控制端只读 probe；未安装/升级/卸载任何包，未执行 `pip freeze`，未启动 CUDA 或训练。
 
 ## 1. 结论

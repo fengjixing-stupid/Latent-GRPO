@@ -37,6 +37,13 @@ class UpstreamOptimizerPatchTests(unittest.TestCase):
         self.assertIn("topk_logits = torch.concat(topk_logits_lst, dim=0)", source)
         self.assertNotIn("topk_logits = torch.concat(topk_ids_lst, dim=0)", source)
 
+    def test_actor_topk_width_follows_rollout_payload(self) -> None:
+        source = _function_source(ACTOR_PATH, "_forward_micro_batch")
+
+        self.assertIn("k=int(topk_ids_rmpad_rolled.size(-1))", source)
+        self.assertIn("k=int(rollout_topk_ids.size(-1))", source)
+        self.assertNotIn("k=10", source)
+
     def test_optimizer_step_preserves_return_and_records_actual_outcome(self) -> None:
         source = _function_source(ACTOR_PATH, "_optimizer_step")
 
@@ -172,6 +179,38 @@ class UpstreamOptimizerPatchTests(unittest.TestCase):
             {**common, "sum": -1.0, "sum_sq": 13.0, "count": 4, "nan_count": 1,
              "masked_count": 3, "min": -3.0, "negative_count": 1, "near_zero_count": 2,
              "flipgrad_trigger_count": 1},
+        )
+
+    def test_three_worker_packets_preserve_rank_local_cuda_allocator_evidence(self) -> None:
+        from latent_grpo_runner.upstream_adapter import merge_worker_observer_packets
+
+        packets = []
+        for rank in range(3):
+            packets.append(
+                {
+                    "worker_rank": rank,
+                    "did_update": True,
+                    "update_count": 1,
+                    "optimizer_steps": [{"did_step": True}],
+                    "component_sufficient_stats": [],
+                    "gpu_memory": {
+                        "device_index": rank,
+                        "current_allocated_bytes": 100 + rank,
+                        "current_reserved_bytes": 200 + rank,
+                        "peak_allocated_bytes": 300 + rank,
+                        "peak_reserved_bytes": 400 + rank,
+                    },
+                }
+            )
+
+        merged = merge_worker_observer_packets(packets, expected_worker_count=3)
+
+        self.assertEqual(
+            merged["gpu_memory_by_worker"],
+            [
+                {"worker_rank": rank, **packets[rank]["gpu_memory"]}
+                for rank in range(3)
+            ],
         )
 
     def test_worker_outcome_disagreement_fails_closed(self) -> None:

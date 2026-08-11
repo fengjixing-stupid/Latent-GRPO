@@ -9,6 +9,7 @@ training math or trigger model work.
 from __future__ import annotations
 
 from collections import Counter
+import json
 import os
 from pathlib import Path
 from typing import Any, Mapping
@@ -23,7 +24,7 @@ from latent_grpo_runner.checkpointing import (
 from latent_grpo_runner.metrics.events import StepContext
 from latent_grpo_runner.metrics.p1 import P1AggregationError, build_p1_train_step_metrics
 from latent_grpo_runner.metrics.schemas import schema_manifest
-from latent_grpo_runner.metrics.storage import AppendOnlyPartWriter, PartBackend
+from latent_grpo_runner.metrics.storage import AppendOnlyPartWriter, PartBackend, atomic_write_json
 
 
 _METRICS_SCHEMA_VERSION = "metrics_schema_v1"
@@ -168,7 +169,27 @@ class DurableMetricsObserver:
             self._commit_metric_rows(facts, rows_table="support_metrics", benchmark_table="support_benchmark_metrics")
             return
         if event_type == "checkpoint_probe":
+            worker_runtime = self._validate_probe_worker_runtime(facts.get("worker_runtime"))
             self._commit_metric_rows(facts, rows_table="probe_metrics", benchmark_table="probe_benchmark_metrics")
+            if worker_runtime is not None:
+                benchmark = facts.get("benchmark")
+                assert isinstance(benchmark, Mapping)
+                path = self.output_root / "probe_worker_runtime.json"
+                checkpoints: list[object] = []
+                if path.exists():
+                    try:
+                        existing = json.loads(path.read_text(encoding="utf-8"))
+                        if isinstance(existing, Mapping) and isinstance(existing.get("checkpoints"), list):
+                            checkpoints = list(existing["checkpoints"])
+                    except (OSError, json.JSONDecodeError) as error:
+                        raise ObserverIntegrationError("existing probe worker runtime is unreadable") from error
+                checkpoints.append(
+                    {"checkpoint_step": benchmark.get("checkpoint_step"), "workers": worker_runtime}
+                )
+                atomic_write_json(
+                    path,
+                    {"schema_version": "probe_worker_runtime_v1", "checkpoints": checkpoints},
+                )
             return
 
         # These existing hooks are intentionally accepted at P0 so enabling the
@@ -179,6 +200,39 @@ class DurableMetricsObserver:
             self._deferred_event_counts[event_type] += 1
             return
         raise ObserverIntegrationError(f"unsupported observer event_type: {event_type}")
+
+    @staticmethod
+    def _validate_probe_worker_runtime(value: object):
+        if value is None:
+            return None
+        if not isinstance(value, list) or not value:
+            raise ObserverIntegrationError("probe worker runtime must be a non-empty list")
+        rows: list[dict[str, object]] = []
+        for item in value:
+            if not isinstance(item, Mapping):
+                raise ObserverIntegrationError("probe worker runtime row must be a mapping")
+            rank = item.get("worker_rank")
+            elapsed = item.get("probe_extra_time_seconds")
+            peak = item.get("probe_peak_memory_bytes")
+            if (
+                type(rank) is not int
+                or rank < 0
+                or type(elapsed) not in {int, float}
+                or float(elapsed) < 0
+                or type(peak) is not int
+                or peak < 0
+            ):
+                raise ObserverIntegrationError("probe worker runtime row is invalid")
+            rows.append(
+                {
+                    "worker_rank": rank,
+                    "probe_extra_time_seconds": float(elapsed),
+                    "probe_peak_memory_bytes": peak,
+                }
+            )
+        if sorted(row["worker_rank"] for row in rows) != list(range(len(rows))):
+            raise ObserverIntegrationError("probe worker runtime ranks are incomplete or duplicated")
+        return rows
 
     def checkpoint(self, *, global_step: int, checkpoint_dir: str | Path | None = None) -> Path:
         """Publish metrics sidecar before upstream marks a checkpoint latest."""
@@ -260,6 +314,10 @@ class DurableMetricsObserver:
             raise ObserverIntegrationError("pre-backward probe must not perform an optimizer update")
         if type(aggregation_worker_count) is not int or aggregation_worker_count < 1:
             raise ObserverIntegrationError("actor_update requires positive aggregation_worker_count")
+        gpu_memory = self._validate_gpu_memory_facts(
+            facts.get("gpu_memory_by_worker"),
+            aggregation_worker_count=aggregation_worker_count,
+        )
 
         next_optimizer_step = self._optimizer_step + update_count
         p1_declared = (
@@ -331,7 +389,44 @@ class DurableMetricsObserver:
                 aggregation_worker_count=aggregation_worker_count,
             )
         self._writers["train_step_metrics"].append([row])
+        if gpu_memory is not None:
+            path = self.output_root / "gpu_runtime_metrics.json"
+            steps: list[object] = []
+            if path.exists():
+                try:
+                    existing = json.loads(path.read_text(encoding="utf-8"))
+                    if isinstance(existing, Mapping) and isinstance(existing.get("steps"), list):
+                        steps = list(existing["steps"])
+                except (OSError, json.JSONDecodeError) as error:
+                    raise ObserverIntegrationError("existing GPU runtime metrics are unreadable") from error
+            steps.append({"global_step": global_step, "optimizer_step": next_optimizer_step, "workers": gpu_memory})
+            atomic_write_json(path, {"schema_version": "gpu_runtime_metrics_v1", "steps": steps})
         self._optimizer_step = next_optimizer_step
+
+    @staticmethod
+    def _validate_gpu_memory_facts(value: object, *, aggregation_worker_count: int):
+        if value is None:
+            return None
+        if not isinstance(value, list) or len(value) != aggregation_worker_count:
+            raise ObserverIntegrationError("GPU memory evidence must contain every worker")
+        fields = (
+            "worker_rank",
+            "device_index",
+            "current_allocated_bytes",
+            "current_reserved_bytes",
+            "peak_allocated_bytes",
+            "peak_reserved_bytes",
+        )
+        rows: list[dict[str, int]] = []
+        for item in value:
+            if not isinstance(item, Mapping) or any(
+                type(item.get(field)) is not int or int(item[field]) < 0 for field in fields
+            ):
+                raise ObserverIntegrationError("GPU memory evidence contains an invalid worker row")
+            rows.append({field: int(item[field]) for field in fields})
+        if sorted(row["worker_rank"] for row in rows) != list(range(aggregation_worker_count)):
+            raise ObserverIntegrationError("GPU memory evidence has duplicate or missing worker ranks")
+        return rows
 
     def _commit_metric_rows(
         self, facts: Mapping[str, object], *, rows_table: str, benchmark_table: str

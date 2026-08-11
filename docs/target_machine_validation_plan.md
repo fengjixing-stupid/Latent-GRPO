@@ -1,5 +1,8 @@
 # Linux 三卡目标机验收计划
 
+> **最终包状态（2026-08-11）：** 计划中记录的 0.1.0/0.1.1 与 FlashInfer 0.2.3 冲突已经在活动元数据中解决；当前固定为 `sgl-kernel==0.1.1`、`flashinfer-python==0.2.5`。真实 CUDA kernel、SGLang rollout 和 FSDP update 仍必须在目标 L20 机器执行 final validation。
+
+
 计划状态：`target_machine_test_deferred`。本文件定义证据门槛，不记录尚未发生的通过结论。
 
 | Gate | 命令/报告 | 通过条件 | 可授予状态 | 失败诊断 |

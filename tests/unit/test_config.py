@@ -72,6 +72,12 @@ class ConfigTests(unittest.TestCase):
         with self.assertRaisesRegex(ConfigError, "requires metrics_enabled"):
             config.with_runtime_overrides(metrics_enabled=False)
 
+    def test_formal_profiles_reject_silent_max_steps_override(self) -> None:
+        for name in ("3gpu-final-low", "3gpu-final-high"):
+            config = load_config(ROOT / "configs" / f"{name}.yaml", workspace_root=ROOT)
+            with self.assertRaisesRegex(ConfigError, "epoch-controlled"):
+                config.with_runtime_overrides(max_steps=2)
+
     def test_non_kaggle_profiles_preserve_upstream_prompt_filter_defaults(self) -> None:
         config = load_config(ROOT / "configs" / "smoke.yaml", workspace_root=ROOT)
         self.assertIsNone(config.data.filter_overlong_prompts)
@@ -117,6 +123,24 @@ class ConfigTests(unittest.TestCase):
             path = Path(temporary_directory) / "unknown.yaml"
             path.write_text(contents + "\nunknown_field: true\n", encoding="utf-8")
             with self.assertRaisesRegex(ConfigError, "unknown field"):
+                load_config(path, workspace_root=ROOT)
+
+    def test_upstream_overrides_reject_unknown_and_topology_owned_keys(self) -> None:
+        contents = (ROOT / "configs" / "smoke.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "unsafe-overrides.yaml"
+            path.write_text(
+                contents + "\nupstream_overrides:\n  actor_rollout_ref.actor.unknown: 1\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ConfigError, "unsupported upstream override"):
+                load_config(path, workspace_root=ROOT)
+
+            path.write_text(
+                contents + "\nupstream_overrides:\n  trainer.n_gpus_per_node: 8\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ConfigError, "topology-owned upstream override"):
                 load_config(path, workspace_root=ROOT)
 
     def test_three_gpu_profile_rejects_non_three_gpu_target(self) -> None:

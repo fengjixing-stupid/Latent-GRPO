@@ -74,8 +74,12 @@ def collect_environment(
         "target_gpu_environment_available": False,
         "cuda_available": False,
         "gpu_count": 0,
+        "gpu_indices": [],
+        "gpu_uuids": [],
         "gpu_names": [],
         "gpu_total_memory_bytes": [],
+        "gpu_memory_used_bytes": [],
+        "gpu_utilization_percent": [],
         "gpu_compute_capabilities": [],
         "cuda_runtime_version": None,
         "cuda_driver_version": None,
@@ -191,8 +195,12 @@ def _target_gpu_probe() -> dict[str, Any]:
         "target_gpu_environment_available": bool(torch_info["cuda_available"] and gpu_count),
         "cuda_available": torch_info["cuda_available"],
         "gpu_count": gpu_count,
+        "gpu_indices": nvidia["indices"],
+        "gpu_uuids": nvidia["uuids"],
         "gpu_names": nvidia["names"],
         "gpu_total_memory_bytes": nvidia["memory_bytes"],
+        "gpu_memory_used_bytes": nvidia["memory_used_bytes"],
+        "gpu_utilization_percent": nvidia["utilization_percent"],
         "gpu_compute_capabilities": nvidia["compute_capabilities"],
         "cuda_runtime_version": torch_info["cuda_runtime_version"],
         "cuda_driver_version": nvidia["driver_version"],
@@ -209,35 +217,112 @@ def _target_gpu_probe() -> dict[str, Any]:
     }
 
 
+def _visible_device_selectors() -> tuple[str, ...] | None:
+    raw = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
+    if not raw:
+        return None
+    selectors = tuple(part.strip() for part in raw.split(",") if part.strip())
+    if not selectors or len(set(selectors)) != len(selectors):
+        return ()
+    if any(not (selector.isdigit() or selector.startswith("GPU-")) for selector in selectors):
+        return ()
+    return selectors
+
+
+def _resolve_nvidia_rows(
+    rows: list[dict[str, Any]], selectors: tuple[str, ...] | None
+) -> list[dict[str, Any]] | None:
+    """Resolve nvidia-smi rows in CUDA_VISIBLE_DEVICES order.
+
+    nvidia-smi reports physical-index order and does not honour
+    CUDA_VISIBLE_DEVICES ordering. The training runtime does honour that order,
+    so the environment report must preserve it to keep logical rank-to-physical
+    GPU mapping deterministic.
+    """
+
+    if selectors is None:
+        return rows
+    ordered: list[dict[str, Any]] = []
+    seen_indices: set[int] = set()
+    for selector in selectors:
+        matches = [
+            row
+            for row in rows
+            if (selector.isdigit() and int(row["index"]) == int(selector))
+            or (selector.startswith("GPU-") and str(row["uuid"]).startswith(selector))
+        ]
+        if len(matches) != 1:
+            return None
+        index = int(matches[0]["index"])
+        if index in seen_indices:
+            return None
+        seen_indices.add(index)
+        ordered.append(matches[0])
+    return ordered
+
+
+def _empty_nvidia_smi() -> dict[str, Any]:
+    return {
+        "indices": [],
+        "uuids": [],
+        "names": [],
+        "memory_bytes": [],
+        "memory_used_bytes": [],
+        "utilization_percent": [],
+        "compute_capabilities": [],
+        "driver_version": None,
+    }
+
+
 def _nvidia_smi() -> dict[str, Any]:
     command = [
         "nvidia-smi",
-        "--query-gpu=name,memory.total,driver_version,compute_cap",
+        "--query-gpu=index,uuid,name,memory.total,memory.used,utilization.gpu,driver_version,compute_cap",
         "--format=csv,noheader,nounits",
     ]
     try:
         completed = subprocess.run(command, check=False, text=True, capture_output=True)
     except OSError:
-        return {"names": [], "memory_bytes": [], "compute_capabilities": [], "driver_version": None}
+        return _empty_nvidia_smi()
     if completed.returncode:
-        return {"names": [], "memory_bytes": [], "compute_capabilities": [], "driver_version": None}
-    rows = list(csv.reader(line for line in completed.stdout.splitlines() if line.strip()))
-    names, memory, capabilities, drivers = [], [], [], []
-    for row in rows:
-        if len(row) != 4:
+        return _empty_nvidia_smi()
+
+    selectors = _visible_device_selectors()
+    if selectors == ():
+        return _empty_nvidia_smi()
+
+    parsed_rows: list[dict[str, Any]] = []
+    for row in csv.reader(line for line in completed.stdout.splitlines() if line.strip()):
+        if len(row) != 8:
             continue
-        names.append(row[0].strip())
         try:
-            memory.append(int(float(row[1])) * 1024**2)
+            parsed_rows.append(
+                {
+                    "index": int(row[0].strip()),
+                    "uuid": row[1].strip(),
+                    "name": row[2].strip(),
+                    "memory_bytes": int(float(row[3])) * 1024**2,
+                    "memory_used_bytes": int(float(row[4])) * 1024**2,
+                    "utilization_percent": int(float(row[5])),
+                    "driver_version": row[6].strip(),
+                    "compute_capability": row[7].strip(),
+                }
+            )
         except ValueError:
-            memory.append(0)
-        capabilities.append(row[3].strip())
-        drivers.append(row[2].strip())
+            continue
+
+    ordered_rows = _resolve_nvidia_rows(parsed_rows, selectors)
+    if ordered_rows is None:
+        return _empty_nvidia_smi()
     return {
-        "names": names,
-        "memory_bytes": memory,
-        "compute_capabilities": capabilities,
-        "driver_version": drivers[0] if drivers else None,
+        "indices": [int(row["index"]) for row in ordered_rows],
+        "uuids": [str(row["uuid"]) for row in ordered_rows],
+        "names": [str(row["name"]) for row in ordered_rows],
+        "memory_bytes": [int(row["memory_bytes"]) for row in ordered_rows],
+        "memory_used_bytes": [int(row["memory_used_bytes"]) for row in ordered_rows],
+        "utilization_percent": [int(row["utilization_percent"]) for row in ordered_rows],
+        "compute_capabilities": [str(row["compute_capability"]) for row in ordered_rows],
+        "driver_version": str(ordered_rows[0]["driver_version"]) if ordered_rows else None,
     }
 
 

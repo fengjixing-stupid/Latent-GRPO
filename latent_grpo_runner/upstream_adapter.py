@@ -279,6 +279,9 @@ def merge_worker_observer_packets(
         "component_available": False,
         "component_unavailable_reason": None,
         "component_sufficient_stats": None,
+        "gpu_memory_available": False,
+        "gpu_memory_unavailable_reason": None,
+        "gpu_memory_by_worker": None,
     }
     ranks = [row.get("worker_rank") for row in rows]
     if (
@@ -288,7 +291,36 @@ def merge_worker_observer_packets(
         or sorted(ranks) != list(range(expected_worker_count))
     ):
         reason = "worker_packet_set_incomplete_or_duplicate"
-        return {**base, "optimizer_update_unavailable_reason": reason, "component_unavailable_reason": reason}
+        return {
+            **base,
+            "optimizer_update_unavailable_reason": reason,
+            "component_unavailable_reason": reason,
+            "gpu_memory_unavailable_reason": reason,
+        }
+
+    memory_fields = (
+        "device_index",
+        "current_allocated_bytes",
+        "current_reserved_bytes",
+        "peak_allocated_bytes",
+        "peak_reserved_bytes",
+    )
+    memory_rows: list[dict[str, int]] = []
+    for row in rows:
+        memory = row.get("gpu_memory")
+        if not isinstance(memory, Mapping) or any(
+            type(memory.get(field)) is not int or int(memory[field]) < 0
+            for field in memory_fields
+        ):
+            memory_rows = []
+            break
+        memory_rows.append(
+            {"worker_rank": int(row["worker_rank"]), **{field: int(memory[field]) for field in memory_fields}}
+        )
+    if len(memory_rows) == expected_worker_count:
+        base.update({"gpu_memory_available": True, "gpu_memory_by_worker": memory_rows})
+    else:
+        base["gpu_memory_unavailable_reason"] = "gpu_memory_missing_or_invalid"
 
     outcome_signatures = []
     for row in rows:

@@ -1,3 +1,7 @@
+# HISTORICAL FULL-ENVIRONMENT SNAPSHOT — DO NOT INSTALL THIS FILE DIRECTLY.
+# The final experiment package uses ../scripts/target_machine/03_install_runtime.sh
+# with the staged top-level requirements/ and constraints/ files. This snapshot is
+# retained only for provenance and contains packages outside the supported runtime.
 # Editable install for the latent-reasoning SGLang package (based on sglang==0.4.6.post1)
 -e ./sglang_latent_reasoning_pkg/python
 # Editable install with no version control (verl==0.4.0)
@@ -43,7 +47,7 @@ fastapi==0.117.1
 fastuuid==0.13.5
 filelock==3.19.1
 flash-attn==2.7.3
-flashinfer-python==0.2.3
+flashinfer-python==0.2.5
 fonttools==4.60.1
 frozendict==2.4.6
 frozenlist==1.7.0

@@ -202,6 +202,7 @@ class DataParallelPPOActor(BasePPOActor):
                 self._latent_grpo_observer_facts["p1_sufficient_stats"]
             ),
             "checkpoint_probe": self._latent_grpo_observer_facts["checkpoint_probe"],
+            "gpu_memory": self._collect_cuda_memory_facts(),
         }
         self._latent_grpo_observer_facts = {
             "optimizer_steps": [],
@@ -211,13 +212,25 @@ class DataParallelPPOActor(BasePPOActor):
         }
         return facts
 
+    def _collect_cuda_memory_facts(self):
+        """Return detached allocator counters for this rank's selected CUDA device."""
+        if not self._latent_grpo_observer_enabled or not is_cuda_available:
+            return None
+        cuda = get_torch_device()
+        device_index = int(cuda.current_device())
+        return {
+            "device_index": device_index,
+            "current_allocated_bytes": int(cuda.memory_allocated(device_index)),
+            "current_reserved_bytes": int(cuda.memory_reserved(device_index)),
+            "peak_allocated_bytes": int(cuda.max_memory_allocated(device_index)),
+            "peak_reserved_bytes": int(cuda.max_memory_reserved(device_index)),
+        }
+
     def _forward_micro_batch(self, micro_batch, temperature, top_p,  calculate_entropy=False, add_noise_dirichlet=False,
                              add_noise_gumbel_softmax=True, collect_component_stats=False,
                              component_response_mask=None, collect_checkpoint_probe=False) -> Tuple[
         torch.Tensor, torch.Tensor]:
         _require_remove_padding_runtime(self.use_remove_padding)
-        if collect_checkpoint_probe and self.use_remove_padding:
-            raise RuntimeError("checkpoint probe currently requires the bounded padded actor path")
 
         def safe_lookup_embeddings(fsdp_wrapped_module, input_ids, target_device=None, target_dtype=None):
             """Look up embeddings safely when the module is wrapped by FSDP."""
@@ -424,7 +437,7 @@ class DataParallelPPOActor(BasePPOActor):
                     # ================================================================
 
                     if add_noise_gumbel_softmax:
-                        log_probs = logprobs_from_logits_topk_gumbel(
+                        log_prob_result = logprobs_from_logits_topk_gumbel(
                             logits=logits_rmpad,
                             rollout_topk_ids=topk_ids_rmpad_rolled,
                             rollout_topk_gumbels=topk_gumbels_rmpad_rolled,
@@ -433,7 +446,12 @@ class DataParallelPPOActor(BasePPOActor):
                             temperature=temperature,
                             inplace_backward=inplace_backward,
                             advantages=current_advantages,
+                            return_probe_tensors=collect_checkpoint_probe,
                         )
+                        if collect_checkpoint_probe:
+                            log_probs, packed_checkpoint_tensors = log_prob_result
+                        else:
+                            log_probs = log_prob_result
                     else:
                         full_logprobs = top_p_renorm_logprobs(logits_rmpad / temperature, top_p)
                         log_probs = full_logprobs.gather(-1, input_ids_rmpad_rolled.unsqueeze(-1)).squeeze(-1)
@@ -472,6 +490,16 @@ class DataParallelPPOActor(BasePPOActor):
                     batch=batch_size,
                     seqlen=seqlen,
                 )
+                if collect_checkpoint_probe:
+                    from latent_grpo_runner.metrics.probe import restore_packed_probe_tensors
+
+                    checkpoint_probe_tensors = restore_packed_probe_tensors(
+                        packed_checkpoint_tensors,
+                        indices=indices,
+                        batch=batch_size,
+                        seqlen=seqlen,
+                        response_length=response_length,
+                    )
                 safe_gather_ids = topk_ids_rmpad_rolled.clone()
                 safe_gather_ids[safe_gather_ids == -100] = 0
 
@@ -521,7 +549,9 @@ class DataParallelPPOActor(BasePPOActor):
                 ) # (B, Seq, K)
                 # logits_rmpad.div_(temperature)
                 latent_probs = torch.softmax(logits_rmpad / temperature, dim=-1)
-                topk_original_probs, topk_indices = torch.topk(latent_probs, k=10, dim=-1)
+                topk_original_probs, topk_indices = torch.topk(
+                    latent_probs, k=int(topk_ids_rmpad_rolled.size(-1)), dim=-1
+                )
                 full_topk_probs = pad_input(
                     hidden_states=topk_original_probs,
                     indices=indices,
@@ -639,7 +669,7 @@ class DataParallelPPOActor(BasePPOActor):
 
                 latent_probs = torch.softmax(logits_full / temperature, dim=-1)
                 full_topk_probs, full_topk_indices = torch.topk(
-                    latent_probs, k=10, dim=-1
+                    latent_probs, k=int(rollout_topk_ids.size(-1)), dim=-1
                 )
                 full_topk_probs = full_topk_probs[:, :-1, :].contiguous()
                 full_topk_indices = full_topk_indices[:, :-1, :].contiguous()
@@ -757,6 +787,9 @@ class DataParallelPPOActor(BasePPOActor):
         self.last_update_did_step = False
         self.last_update_count = 0
         update_count = 0
+        if self._latent_grpo_observer_enabled and is_cuda_available:
+            cuda = get_torch_device()
+            cuda.reset_peak_memory_stats(cuda.current_device())
         pre_backward_monitor_probe = bool(
             data.meta_info.get("pre_backward_monitor_probe", False)
         )

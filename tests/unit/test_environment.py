@@ -1,8 +1,16 @@
 from __future__ import annotations
 
+import os
+import subprocess
 import unittest
+from unittest.mock import patch
 
-from latent_grpo_runner.environment import build_report_envelope, collect_environment, validate_target_environment
+from latent_grpo_runner.environment import (
+    _nvidia_smi,
+    build_report_envelope,
+    collect_environment,
+    validate_target_environment,
+)
 
 
 class EnvironmentTests(unittest.TestCase):
@@ -96,6 +104,48 @@ class EnvironmentTests(unittest.TestCase):
             required_precision="float16",
         )
         self.assertEqual(reasons, [])
+
+    def test_nvidia_smi_probe_respects_numeric_cuda_visible_devices(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=["nvidia-smi"],
+            returncode=0,
+            stdout=(
+                "0, GPU-0, L20, 46068, 30559, 100, 550.90.07, 8.9\n"
+                "4, GPU-4, L20, 46068, 1, 0, 550.90.07, 8.9\n"
+                "5, GPU-5, L20, 46068, 1, 0, 550.90.07, 8.9\n"
+                "6, GPU-6, L20, 46068, 1, 0, 550.90.07, 8.9\n"
+                "7, GPU-7, L20, 46068, 18063, 17, 550.90.07, 8.9\n"
+            ),
+            stderr="",
+        )
+        with patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "4,5,6"}, clear=False), patch(
+            "latent_grpo_runner.environment.subprocess.run", return_value=completed
+        ):
+            report = _nvidia_smi()
+
+        self.assertEqual(report["indices"], [4, 5, 6])
+        self.assertEqual(report["memory_used_bytes"], [1024**2] * 3)
+        self.assertEqual(report["utilization_percent"], [0, 0, 0])
+
+    def test_nvidia_smi_probe_preserves_cuda_visible_devices_order(self) -> None:
+        completed = subprocess.CompletedProcess(
+            args=["nvidia-smi"],
+            returncode=0,
+            stdout=(
+                "4, GPU-4, L20, 46068, 4, 10, 550.90.07, 8.9\n"
+                "5, GPU-5, L20, 46068, 5, 20, 550.90.07, 8.9\n"
+                "6, GPU-6, L20, 46068, 6, 30, 550.90.07, 8.9\n"
+            ),
+            stderr="",
+        )
+        with patch.dict(os.environ, {"CUDA_VISIBLE_DEVICES": "6,4,5"}, clear=False), patch(
+            "latent_grpo_runner.environment.subprocess.run", return_value=completed
+        ):
+            report = _nvidia_smi()
+
+        self.assertEqual(report["indices"], [6, 4, 5])
+        self.assertEqual(report["memory_used_bytes"], [6 * 1024**2, 4 * 1024**2, 5 * 1024**2])
+        self.assertEqual(report["utilization_percent"], [30, 10, 20])
 
     def test_target_report_envelope_has_required_machine_readable_fields(self) -> None:
         report = build_report_envelope(

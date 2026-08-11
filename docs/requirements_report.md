@@ -1,5 +1,8 @@
 # Requirements candidate report
 
+> **最终包状态（2026-08-11）：** 本报告主体是修复前的审计快照。当前支持的活动组合为 `flashinfer-python==0.2.5`、`sgl-kernel==0.1.1`；最终安装与目标机验证入口见 `docs/3GPU_RUNBOOK.md`。
+
+
 Status date: 2026-08-03.  The files in `requirements/` are evidence-based input groups, not a Linux lock.  They were not generated with `pip freeze`; `constraints/linux-cu124-py311.txt` is a candidate and remains `target_machine_test_deferred` until the teammate returns target-machine reports.
 
 ## Runtime and development Python distributions

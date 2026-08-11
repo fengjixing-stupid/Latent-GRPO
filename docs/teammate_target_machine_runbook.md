@@ -66,10 +66,10 @@ bash scripts/target_machine/02_install_pytorch.sh
 
 ## 4. 安装 runtime、特殊扩展和本地 fork
 
-先解决 `sgl-kernel` 冲突：vendored SGLang 元数据声明 0.1.0，而作者 README 给出 0.1.1。不要让 pip 静默替换。结合目标 wheel availability、上游 commit 和维护者结论显式选择：
+最终实验包已经解决活动元数据冲突：运行时代码、SGLang editable metadata、requirements 与 constraint 统一使用 `sgl-kernel==0.1.1` 和 `flashinfer-python==0.2.5`。执行：
 
 ```bash
-export SGL_KERNEL_VERSION=0.1.0  # 示例；必须先完成上述证据核对
+export SGL_KERNEL_VERSION=0.1.1
 bash scripts/target_machine/03_install_runtime.sh
 ```
 
@@ -78,11 +78,12 @@ bash scripts/target_machine/03_install_runtime.sh
 1. `runtime-core.txt`；
 2. `metrics.txt`；
 3. `reward-math.txt`；
-4. `runtime-sglang.txt`（包含 FlashInfer 0.2.3 candidate）；
-5. 显式 `sgl-kernel==$SGL_KERNEL_VERSION`；
-6. PyTorch 已安装后用 `--no-build-isolation` 安装 FlashAttention 2.7.3 candidate；
+4. `runtime-sglang.txt`（FlashInfer 0.2.5、sgl-kernel 0.1.1）；
+5. `tracking-optional.txt`；
+6. PyTorch 已安装后用 `--no-build-isolation` 安装 FlashAttention 2.7.3；
 7. `pip install --no-deps -e Latent-GRPO/verl-0.4.x`；
-8. `pip install --no-deps -e Latent-GRPO/sglang_latent_reasoning_pkg`。
+8. `pip install --no-deps -e Latent-GRPO/sglang_latent_reasoning_pkg/python`；
+9. `pip check`。
 
 本地 forks 必须带 `--no-deps`，否则其元数据可能覆盖已审计组合。FlashAttention、FlashInfer、sgl-kernel 都是 CUDA/torch/Python/glibc/C++ ABI 敏感包；wheel 能安装不表示 kernel 能运行。
 
