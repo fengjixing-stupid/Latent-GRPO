@@ -55,3 +55,4 @@
 
 - 每次取得实质进展后，在 `cairn/LOG.md` 顶部添加一条记录（摘要与指针）；结论沉淀到 `cairn/` 知识专题文档中。
 - 跨项目可复用经验应在知识库连接后通过毕业机制沉淀（provider 已暂缓对接——见上方“初始化配置”）。
+- 生成或修改三卡目标机的训练、部署、环境、监控或验收脚本前，必须阅读 `cairn/3gpu-runtime-packaging.md` 与 `cairn/3gpu-deployment-lessons.md`；交付前逐项报告 GPU/映射、拓扑、环境/依赖、网络/存储、语义/验收五类检查，未知项必须先探测或 fail-closed。

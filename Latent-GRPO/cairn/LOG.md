@@ -2,6 +2,12 @@
 
 本文件按时间倒序记录实质进展——最新条目位于顶部、紧接在本说明之后。每个条目保持简短，只包含摘要与指针；结论沉淀到 `cairn/<topic>.md`。
 
+## 2026-08-15 · 沉淀三卡目标机部署经验
+
+- 从 teammate 的 L20 部署排障中沉淀 CUDA/Conda/代理、双层 Python 环境、精确 cuDNN wheel、GPU 映射和证据分层经验。
+- 后续生成或修改三卡训练、部署、环境、监控或验收脚本，必须执行五类设计检查并对未知项 fail-closed。
+- 当前真相见 `3gpu-deployment-lessons.md`；训练拓扑与 runtime gate 仍见 `3gpu-runtime-packaging.md`。
+
 ## 2026-08-11 · 修正 Kaggle 数据集挂载路径
 
 - 已运行 notebook 的首个阻塞为用户新增 `cp` 单元缺少递归参数，导致 `/kaggle/working/data` 中不存在 train/validation parquet，训练未启动并按设计输出 0/29。
