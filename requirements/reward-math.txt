@@ -3,4 +3,4 @@
 math-verify
 mathruler
 pylatexenc
-pyext
+# pyext is intentionally excluded from the Python 3.11 text-math runtime; it is only relevant to optional code/prime reward workloads.
