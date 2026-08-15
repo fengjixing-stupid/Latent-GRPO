@@ -133,6 +133,7 @@ actor_rollout_ref:
     latent_end_token_id: 524
     add_noise_gumbel_softmax: False
     use_one_sided_gumbel_noise: True
+    one_sided_gumbel_delta: 0.0
     add_noise_dirichlet: False
     max_topk: 10
     # number of responses (i.e. num sample times)

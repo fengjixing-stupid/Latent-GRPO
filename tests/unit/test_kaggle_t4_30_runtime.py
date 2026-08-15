@@ -173,6 +173,10 @@ class KaggleT430RuntimeTests(unittest.TestCase):
         self.assertTrue(event["rows"][0]["credit_concentration_available"])
         self.assertTrue(event["benchmark"]["credit_autograd_executed"])
         self.assertTrue(event["benchmark"]["parameters_unchanged"])
+        self.assertEqual(
+            event["worker_runtime"],
+            [{"worker_rank": 0, "probe_extra_time_seconds": 0.01, "probe_peak_memory_bytes": 10}],
+        )
 
     def test_runtime_hook_and_named_argument_runner_are_formal_entrypoints(self) -> None:
         actor = ACTOR.read_text(encoding="utf-8")

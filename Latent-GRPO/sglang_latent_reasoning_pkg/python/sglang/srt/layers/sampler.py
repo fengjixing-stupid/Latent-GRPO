@@ -39,6 +39,19 @@ def _require_latent_end_token_id():
     return latent_end_token_id
 
 
+def _apply_one_sided_gumbel_delta(
+    gumbels, use_one_sided_gumbel_noise, one_sided_gumbel_deltas
+):
+    """Apply the paper's clipped-and-shifted positive margin per request."""
+    one_sided_gumbels = gumbels + 1.5 + one_sided_gumbel_deltas
+    return torch.where(use_one_sided_gumbel_noise, one_sided_gumbels, gumbels)
+
+
+def _scale_gumbels_by_request(gumbels, noise_scales):
+    """Scale each request row without reusing the first request's value."""
+    return noise_scales * gumbels
+
+
 class Sampler(nn.Module):
     def __init__(self):
         super().__init__()
@@ -104,15 +117,16 @@ class Sampler(nn.Module):
                 gumbels = -torch.empty_like(sampling_log_probs).exponential_().log()
                 gumbels = gumbels.clamp(-1.5, 3)
                 use_one_sided_gumbel_noise = sampling_info.use_one_sided_gumbel_noise.view(-1, 1)
-                if use_one_sided_gumbel_noise.any().item():
-                    one_sided_gumbels = gumbels - (-1.5)
-                    gumbels = torch.where(
-                        use_one_sided_gumbel_noise,
-                        one_sided_gumbels,
-                        gumbels,
-                    )
+                gumbels = _apply_one_sided_gumbel_delta(
+                    gumbels,
+                    use_one_sided_gumbel_noise,
+                    sampling_info.one_sided_gumbel_deltas,
+                )
 
-                gumbels = sampling_info.noise_scales[0] * gumbels
+                gumbels = _scale_gumbels_by_request(
+                    gumbels,
+                    sampling_info.noise_scales,
+                )
 
                 
                 topk_gumbels_scores = sampling_log_probs + gumbels

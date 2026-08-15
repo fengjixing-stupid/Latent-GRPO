@@ -174,6 +174,38 @@ class UpstreamOptimizerPatchTests(unittest.TestCase):
              "flipgrad_trigger_count": 1},
         )
 
+    def test_three_worker_packets_preserve_rank_local_cuda_allocator_evidence(self) -> None:
+        from latent_grpo_runner.upstream_adapter import merge_worker_observer_packets
+
+        packets = []
+        for rank in range(3):
+            packets.append(
+                {
+                    "worker_rank": rank,
+                    "did_update": True,
+                    "update_count": 1,
+                    "optimizer_steps": [{"did_step": True}],
+                    "component_sufficient_stats": [],
+                    "gpu_memory": {
+                        "device_index": rank,
+                        "current_allocated_bytes": 100 + rank,
+                        "current_reserved_bytes": 200 + rank,
+                        "peak_allocated_bytes": 300 + rank,
+                        "peak_reserved_bytes": 400 + rank,
+                    },
+                }
+            )
+
+        merged = merge_worker_observer_packets(packets, expected_worker_count=3)
+
+        self.assertEqual(
+            merged["gpu_memory_by_worker"],
+            [
+                {"worker_rank": rank, **packets[rank]["gpu_memory"]}
+                for rank in range(3)
+            ],
+        )
+
     def test_worker_outcome_disagreement_fails_closed(self) -> None:
         from latent_grpo_runner.upstream_adapter import merge_worker_observer_packets
 

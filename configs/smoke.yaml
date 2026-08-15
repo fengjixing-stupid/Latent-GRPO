@@ -48,6 +48,7 @@ rollout:
   enable_latent: true
   add_noise_gumbel_softmax: true
   use_one_sided_gumbel_noise: true
+  one_sided_gumbel_delta: 0.0
 training:
   max_steps: 2
   seed: 17

@@ -20,7 +20,7 @@ def sample() -> list[dict[str, object]]:
     completed = subprocess.run(
         [
             "nvidia-smi",
-            "--query-gpu=index,uuid,name,memory.used,memory.total",
+            "--query-gpu=index,uuid,name,memory.used,memory.total,utilization.gpu",
             "--format=csv,noheader,nounits",
         ],
         capture_output=True,
@@ -31,8 +31,8 @@ def sample() -> list[dict[str, object]]:
         raise RuntimeError(f"nvidia-smi_exit_{completed.returncode}")
     rows: list[dict[str, object]] = []
     for line in completed.stdout.splitlines():
-        fields = [field.strip() for field in line.split(",", 4)]
-        if len(fields) != 5:
+        fields = [field.strip() for field in line.split(",", 5)]
+        if len(fields) != 6:
             continue
         rows.append(
             {
@@ -41,6 +41,7 @@ def sample() -> list[dict[str, object]]:
                 "name": fields[2],
                 "memory_used_mib": int(fields[3]),
                 "memory_total_mib": int(fields[4]),
+                "gpu_utilization_percent": int(fields[5]),
             }
         )
     return rows
@@ -72,11 +73,13 @@ def main() -> int:
 
     peaks: dict[str, int] = {}
     totals: dict[str, int] = {}
+    utilization: dict[str, list[int]] = {}
     for item in samples:
         for gpu in item["gpus"]:  # type: ignore[index]
             index = str(gpu["index"])
             peaks[index] = max(peaks.get(index, 0), int(gpu["memory_used_mib"]))
             totals[index] = int(gpu["memory_total_mib"])
+            utilization.setdefault(index, []).append(int(gpu["gpu_utilization_percent"]))
     payload = {
         "command": command,
         "started_at": started_at,
@@ -86,6 +89,12 @@ def main() -> int:
         "samples": samples,
         "peak_memory_used_mib_by_gpu": peaks,
         "memory_total_mib_by_gpu": totals,
+        "peak_gpu_utilization_percent_by_gpu": {
+            index: max(values) for index, values in utilization.items()
+        },
+        "average_gpu_utilization_percent_by_gpu": {
+            index: sum(values) / len(values) for index, values in utilization.items()
+        },
         "telemetry_error": telemetry_error,
     }
     output = Path(args.output)
@@ -98,4 +107,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

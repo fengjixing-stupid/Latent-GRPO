@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -18,7 +19,17 @@ class ConfigError(ValueError):
 
 
 SUPPORTED_PROFILES = frozenset(
-    {"smoke", "3gpu-low", "3gpu-high-smoke", "kaggle-t4-monitor", "kaggle-t4-30-metric"}
+    {
+        "smoke",
+        "3gpu-low",
+        "3gpu-high-smoke",
+        "3gpu-final-low",
+        "3gpu-final-validation",
+        "3gpu-final-high",
+        "3gpu-final-high-validation",
+        "kaggle-t4-monitor",
+        "kaggle-t4-30-metric",
+    }
 )
 _TOP_LEVEL_KEYS = frozenset(
     {
@@ -35,6 +46,7 @@ _TOP_LEVEL_KEYS = frozenset(
         "training",
         "paths",
         "features",
+        "upstream_overrides",
     }
 )
 _NESTED_KEYS = {
@@ -92,6 +104,7 @@ _NESTED_KEYS = {
             "enable_latent",
             "add_noise_gumbel_softmax",
             "use_one_sided_gumbel_noise",
+            "one_sided_gumbel_delta",
         }
     ),
     "training": frozenset(
@@ -100,6 +113,46 @@ _NESTED_KEYS = {
     "paths": frozenset({"upstream_repo_path", "output_root", "cache_root"}),
     "features": frozenset({"metrics_enabled", "support_enabled", "checkpoint_probe_enabled", "credit_probe_enabled"}),
 }
+
+_ALLOWED_UPSTREAM_OVERRIDES = frozenset(
+    {
+        "data.val_batch_size",
+        "actor_rollout_ref.actor.optim.lr",
+        "actor_rollout_ref.actor.ppo_max_token_len_per_gpu",
+        "actor_rollout_ref.actor.kl_loss_coef",
+        "actor_rollout_ref.actor.neg_adv_weight",
+        "actor_rollout_ref.actor.kl_loss_type",
+        "actor_rollout_ref.actor.entropy_coeff",
+        "actor_rollout_ref.actor.freeze_embedding",
+        "actor_rollout_ref.rollout.val_kwargs.do_sample",
+        "actor_rollout_ref.rollout.val_kwargs.temperature",
+        "actor_rollout_ref.rollout.val_kwargs.top_p",
+        "actor_rollout_ref.rollout.val_kwargs.top_k",
+        "actor_rollout_ref.ref.strategy",
+        "algorithm.use_kl_in_reward",
+        "algorithm.exclude_overlong_samples_from_advantage",
+        "trainer.critic_warmup",
+        "trainer.logger",
+        "trainer.project_name",
+        "trainer.experiment_name",
+        "trainer.val_before_train",
+        "trainer.save_freq",
+        "trainer.test_freq",
+        "trainer.balance_batch",
+        "trainer.total_epochs",
+    }
+)
+_TOPOLOGY_OWNED_UPSTREAM_OVERRIDES = frozenset(
+    {
+        "data.train_batch_size",
+        "actor_rollout_ref.actor.ppo_mini_batch_size",
+        "actor_rollout_ref.actor.ppo_micro_batch_size_per_gpu",
+        "actor_rollout_ref.rollout.n",
+        "trainer.n_gpus_per_node",
+        "trainer.nnodes",
+        "trainer.total_training_steps",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -167,6 +220,7 @@ class RolloutConfig:
     enable_latent: bool
     add_noise_gumbel_softmax: bool
     use_one_sided_gumbel_noise: bool
+    one_sided_gumbel_delta: float
 
 
 @dataclass(frozen=True)
@@ -199,6 +253,7 @@ class ResolvedConfig:
     training: TrainingConfig
     paths: Mapping[str, Path]
     features: FeatureConfig
+    upstream_overrides: Mapping[str, Any]
     workspace_root: Path
     resume_from: Path | None = None
 
@@ -236,6 +291,7 @@ class ResolvedConfig:
             "training": self.training.__dict__,
             "paths": {key: _safe_relative_path(value, self.workspace_root) for key, value in self.paths.items()},
             "features": self.features.__dict__,
+            "upstream_overrides": dict(self.upstream_overrides),
             "resume_from": (
                 None if self.resume_from is None else _safe_relative_path(self.resume_from, self.workspace_root)
             ),
@@ -287,6 +343,7 @@ class ResolvedConfig:
             "actor_rollout_ref.rollout.latent_end_token_id": self.model.latent_end_token_id,
             "actor_rollout_ref.rollout.add_noise_gumbel_softmax": self.rollout.add_noise_gumbel_softmax,
             "actor_rollout_ref.rollout.use_one_sided_gumbel_noise": self.rollout.use_one_sided_gumbel_noise,
+            "actor_rollout_ref.rollout.one_sided_gumbel_delta": self.rollout.one_sided_gumbel_delta,
             "actor_rollout_ref.rollout.n": self.batch.rollout_n,
             "actor_rollout_ref.ref.log_prob_micro_batch_size_per_gpu": self.batch.ref_log_prob_micro_batch_per_gpu,
             "actor_rollout_ref.ref.fsdp_config.param_offload": self.model.ref_param_offload,
@@ -294,9 +351,11 @@ class ResolvedConfig:
             "algorithm.filter_groups.max_num_gen_batches": self.training.filter_groups_max_num_gen_batches,
             "trainer.n_gpus_per_node": self.hardware.required_gpus,
             "trainer.nnodes": 1,
-            "trainer.total_training_steps": self.training.max_steps,
             "trainer.default_local_dir": self.paths["output_root"],
         }
+        if self.profile_kind != "formal_training":
+            values["trainer.total_training_steps"] = self.training.max_steps
+        values.update(self.upstream_overrides)
         if self.data.filter_overlong_prompts is not None:
             values["data.filter_overlong_prompts"] = self.data.filter_overlong_prompts
         if self.data.filter_overlong_prompts_workers is not None:
@@ -437,6 +496,9 @@ def _validate_structure(raw: Mapping[str, Any]) -> None:
         if not isinstance(value, dict):
             raise ConfigError(f"{section} must be a mapping")
         _unknown_keys(section, value, allowed)
+    overrides = raw.get("upstream_overrides", {})
+    if not isinstance(overrides, dict):
+        raise ConfigError("upstream_overrides must be a mapping")
 
 
 def _unknown_keys(label: str, values: Mapping[str, Any], allowed: frozenset[str]) -> None:
@@ -516,6 +578,7 @@ def _build_config(raw: Mapping[str, Any], root: Path) -> ResolvedConfig:
                 enable_latent=_expect_bool(raw["rollout"], "enable_latent"),
                 add_noise_gumbel_softmax=_expect_bool(raw["rollout"], "add_noise_gumbel_softmax"),
                 use_one_sided_gumbel_noise=_expect_bool(raw["rollout"], "use_one_sided_gumbel_noise"),
+                one_sided_gumbel_delta=_expect_float(raw["rollout"], "one_sided_gumbel_delta"),
             ),
             training=TrainingConfig(
                 max_steps=_expect_int(raw["training"], "max_steps"),
@@ -534,6 +597,7 @@ def _build_config(raw: Mapping[str, Any], root: Path) -> ResolvedConfig:
                 checkpoint_probe_enabled=_expect_bool(raw["features"], "checkpoint_probe_enabled"),
                 credit_probe_enabled=_expect_bool(raw["features"], "credit_probe_enabled"),
             ),
+            upstream_overrides=_build_upstream_overrides(raw.get("upstream_overrides", {})),
             workspace_root=root,
         )
     except KeyError as error:
@@ -545,6 +609,7 @@ def _build_config(raw: Mapping[str, Any], root: Path) -> ResolvedConfig:
 def _validate_semantics(config: ResolvedConfig) -> None:
     if config.profile_name.startswith("paper-") or config.profile_kind == "paper":
         raise ConfigError("paper profiles are not accepted as engineering profiles")
+    _validate_upstream_overrides(config.upstream_overrides)
     if config.profile_name not in SUPPORTED_PROFILES:
         raise ConfigError(f"unsupported profile: {config.profile_name}")
     if config.launcher.mode not in {"ray_direct", "torchrun_control"}:
@@ -690,6 +755,11 @@ def _validate_semantics(config: ResolvedConfig) -> None:
         raise ConfigError("gpu_memory_utilization must be in (0, 1]")
     if not 0 < config.rollout.temperature or not 0 < config.rollout.gumbel_softmax_temperature:
         raise ConfigError("rollout temperatures must be positive")
+    if (
+        not math.isfinite(config.rollout.one_sided_gumbel_delta)
+        or config.rollout.one_sided_gumbel_delta < 0
+    ):
+        raise ConfigError("one_sided_gumbel_delta must be finite and non-negative")
     if not 0 < config.rollout.top_p <= 1:
         raise ConfigError("top_p must be in (0, 1]")
 
@@ -720,6 +790,31 @@ def _expect_bool(values: Mapping[str, Any], key: str) -> bool:
     if not isinstance(value, bool):
         raise ConfigError(f"{key} must be a boolean")
     return value
+
+
+def _build_upstream_overrides(values: Mapping[str, Any]) -> dict[str, Any]:
+    overrides: dict[str, Any] = {}
+    for key, value in values.items():
+        if not isinstance(key, str) or not key:
+            raise ConfigError("upstream override keys must be non-empty strings")
+        if type(value) not in {str, int, float, bool}:
+            raise ConfigError(f"upstream override {key} must be a scalar")
+        if isinstance(value, str) and not value:
+            raise ConfigError(f"upstream override {key} must not be empty")
+        overrides[key] = value
+    return overrides
+
+
+def _validate_upstream_overrides(values: Mapping[str, Any]) -> None:
+    topology_owned = sorted(set(values) & _TOPOLOGY_OWNED_UPSTREAM_OVERRIDES)
+    if topology_owned:
+        raise ConfigError(
+            "topology-owned upstream override must use typed config fields: "
+            + ", ".join(topology_owned)
+        )
+    unsupported = sorted(set(values) - _ALLOWED_UPSTREAM_OVERRIDES)
+    if unsupported:
+        raise ConfigError("unsupported upstream override: " + ", ".join(unsupported))
 
 
 def validate_latent_end_token(model: ModelConfig, tokenizer: Any, model_config: Any) -> dict[str, Any]:

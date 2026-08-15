@@ -12,6 +12,7 @@
 # limitations under the License.
 # ==============================================================================
 """Sampling parameters for text generation."""
+import math
 import torch
 from typing import Any, Dict, List, Optional, Union
 
@@ -61,6 +62,7 @@ class SamplingParams:
         spaces_between_special_tokens: bool = True,
         no_stop_trim: bool = False,
         custom_params: Optional[Dict[str, Any]] = None,
+        one_sided_gumbel_delta: float = 0.0,
     ) -> None:
         self.max_new_tokens = max_new_tokens
         self.stop_strs = stop
@@ -81,6 +83,7 @@ class SamplingParams:
         self.noise_scale = noise_scale
         self.add_noise_gumbel_softmax = add_noise_gumbel_softmax
         self.use_one_sided_gumbel_noise = use_one_sided_gumbel_noise
+        self.one_sided_gumbel_delta = one_sided_gumbel_delta
         # ==========
         # end of latent reasoning
         # ==========
@@ -109,6 +112,16 @@ class SamplingParams:
 
 
     def verify(self):
+        if (
+            isinstance(self.one_sided_gumbel_delta, bool)
+            or not isinstance(self.one_sided_gumbel_delta, (int, float))
+            or not math.isfinite(self.one_sided_gumbel_delta)
+            or self.one_sided_gumbel_delta < 0
+        ):
+            raise ValueError(
+                "one_sided_gumbel_delta must be finite and non-negative, got "
+                f"{self.one_sided_gumbel_delta}."
+            )
         if self.temperature < 0.0:
             raise ValueError(
                 f"temperature must be non-negative, got {self.temperature}."
@@ -178,4 +191,4 @@ class SamplingParams:
             self.stop_str_max_len = stop_str_max_len
 
     def post_init_latent_mode(self):
-        self.latent_mode = torch.tensor(True, dtype=torch.bool, device='cuda') 
+        self.latent_mode = torch.tensor(True, dtype=torch.bool, device='cuda')

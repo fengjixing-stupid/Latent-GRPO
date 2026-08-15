@@ -22,6 +22,8 @@ env/
 
 # Training outputs that should not enter Git
 /models/
+/artifacts/validation/
+/artifacts/runs/
 checkpoints/
 outputs/
 wandb/

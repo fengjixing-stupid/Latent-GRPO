@@ -242,6 +242,61 @@ class T4RuntimeSemanticTests(unittest.TestCase):
         self.assertLess(backend, override)
         self.assertIn("latent_batch_next_token_ids", source[latent:override + 200])
 
+    def test_one_sided_delta_shifts_only_enabled_rows_before_noise_scaling(self):
+        torch = self.torch
+        source = SGLANG_SAMPLER.read_text(encoding="utf-8")
+        self.assertIn("def _apply_one_sided_gumbel_delta", source)
+        fn = _extract_function(
+            SGLANG_SAMPLER,
+            "_apply_one_sided_gumbel_delta",
+            {"torch": torch},
+        )
+        clipped = torch.tensor(
+            [[-1.5, 0.0, 3.0], [-1.5, 0.0, 3.0]],
+            dtype=torch.float32,
+        )
+        enabled = torch.tensor([[True], [False]])
+        deltas = torch.tensor([[0.001], [0.25]], dtype=torch.float32)
+
+        actual = fn(clipped, enabled, deltas)
+
+        expected = torch.tensor(
+            [[0.001, 1.501, 4.501], [-1.5, 0.0, 3.0]],
+            dtype=torch.float32,
+        )
+        self.assertTrue(torch.allclose(actual, expected, atol=1e-7, rtol=0))
+        zero_delta = fn(
+            clipped[:1],
+            torch.tensor([[True]]),
+            torch.tensor([[0.0]], dtype=torch.float32),
+        )
+        self.assertTrue(
+            torch.equal(zero_delta, torch.tensor([[0.0, 1.5, 4.5]], dtype=torch.float32))
+        )
+
+        self.assertIn("def _scale_gumbels_by_request", source)
+        scale_fn = _extract_function(
+            SGLANG_SAMPLER,
+            "_scale_gumbels_by_request",
+            {"torch": torch},
+        )
+        scaled = scale_fn(actual, torch.tensor([[2.0], [0.5]]))
+        scaled_expected = torch.tensor(
+            [[0.002, 3.002, 9.002], [-0.75, 0.0, 1.5]],
+            dtype=torch.float32,
+        )
+        self.assertTrue(torch.allclose(scaled, scaled_expected, atol=1e-7, rtol=0))
+
+        tree = ast.parse(source)
+        forward = next(
+            node for node in ast.walk(tree) if isinstance(node, ast.FunctionDef) and node.name == "forward"
+        )
+        forward_source = ast.get_source_segment(source, forward)
+        transform_index = forward_source.index("_apply_one_sided_gumbel_delta(")
+        scale_index = forward_source.index("_scale_gumbels_by_request(")
+        self.assertLess(transform_index, scale_index)
+        self.assertNotIn("sampling_info.noise_scales[0]", forward_source)
+
 
 if __name__ == "__main__":
     unittest.main()

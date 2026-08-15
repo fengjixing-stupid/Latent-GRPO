@@ -119,6 +119,59 @@ class ConfigTests(unittest.TestCase):
             with self.assertRaisesRegex(ConfigError, "unknown field"):
                 load_config(path, workspace_root=ROOT)
 
+    def test_one_sided_gumbel_delta_is_typed_hash_bound_and_validated(self) -> None:
+        smoke_path = ROOT / "configs" / "smoke.yaml"
+        contents = smoke_path.read_text(encoding="utf-8")
+        baseline = load_config(smoke_path, workspace_root=ROOT)
+        self.assertEqual(getattr(baseline.rollout, "one_sided_gumbel_delta", None), 0.0)
+        self.assertIn(
+            "actor_rollout_ref.rollout.one_sided_gumbel_delta=0.0",
+            baseline.author_hydra_overrides(),
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "delta.yaml"
+            path.write_text(
+                contents.replace("one_sided_gumbel_delta: 0.0", "one_sided_gumbel_delta: 0.001"),
+                encoding="utf-8",
+            )
+            configured = load_config(path, workspace_root=ROOT)
+            self.assertEqual(configured.rollout.one_sided_gumbel_delta, 0.001)
+            self.assertNotEqual(configured.config_hash, baseline.config_hash)
+
+            for invalid in ("-0.001", ".nan"):
+                path.write_text(
+                    contents.replace("one_sided_gumbel_delta: 0.0", f"one_sided_gumbel_delta: {invalid}"),
+                    encoding="utf-8",
+                )
+                with self.assertRaisesRegex(ConfigError, "must be finite and non-negative"):
+                    load_config(path, workspace_root=ROOT)
+
+        for profile_path in sorted((ROOT / "configs").rglob("*.yaml")):
+            self.assertIn(
+                "one_sided_gumbel_delta:",
+                profile_path.read_text(encoding="utf-8"),
+                str(profile_path),
+            )
+
+    def test_upstream_overrides_reject_unknown_and_topology_owned_keys(self) -> None:
+        contents = (ROOT / "configs" / "smoke.yaml").read_text(encoding="utf-8")
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            path = Path(temporary_directory) / "unsafe-overrides.yaml"
+            path.write_text(
+                contents + "\nupstream_overrides:\n  actor_rollout_ref.actor.unknown: 1\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ConfigError, "unsupported upstream override"):
+                load_config(path, workspace_root=ROOT)
+
+            path.write_text(
+                contents + "\nupstream_overrides:\n  trainer.n_gpus_per_node: 8\n",
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ConfigError, "topology-owned upstream override"):
+                load_config(path, workspace_root=ROOT)
+
     def test_three_gpu_profile_rejects_non_three_gpu_target(self) -> None:
         contents = (ROOT / "configs" / "3gpu-low.yaml").read_text(encoding="utf-8")
         with tempfile.TemporaryDirectory() as temporary_directory:

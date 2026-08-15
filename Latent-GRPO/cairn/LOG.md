@@ -8,6 +8,25 @@
 - 后续生成或修改三卡训练、部署、环境、监控或验收脚本，必须执行五类设计检查并对未知项 fail-closed。
 - 当前真相见 `3gpu-deployment-lessons.md`；训练拓扑与 runtime gate 仍见 `3gpu-runtime-packaging.md`。
 
+## 2026-08-11 · Low/High 三卡训练链路对称化
+
+- 新增 `3gpu-final-high` 与 `3gpu-final-high-validation`；High 正式 prompt/mini `12/12` 在三卡下保持作者每 rank 32 trajectories，作者 Qwen/长度/KL/offload/rollout 语义不变。
+- preflight、final validation、formal training wrapper 现由 `--config` 选择 Low/High，并强制运行时模型为本地目录、数据为本地文件；formal acceptance 必须匹配对应 validation profile。
+- runbook 与技术交接已补齐模型下载来源、本地模型/数据/输出传参和 Low/High 一键命令；静态/单元证据完成后仍保持 `TARGET_RUNTIME_EXECUTION_REQUIRED`。
+- 稳定结论见 `3gpu-runtime-packaging.md`，操作入口见 `../../docs/3GPU_RUNBOOK.md`。
+
+## 2026-08-11 · 新增面向大模型的单文件技术交接
+
+- `../../docs/PROJECT_TECHNICAL_HANDOFF.md` 现为 teammate 向其他大模型提供项目上下文的首选入口，统一说明架构、权威文件、作者参数边界、29 指标和接手顺序。
+- 文档明确区分 Mac 本地证据与三卡 target runtime，并在末尾提供 acceptance-gated 正式训练 wrapper 示例；三卡状态仍为 `TARGET_RUNTIME_EXECUTION_REQUIRED`。
+
+## 2026-08-11 · 完成三卡最终门禁与正式训练打包
+
+- 新增 low/high 作者真值、正式/两步 validation 三卡配置、资产/preflight/final/training wrapper，以及机器/人类验收报告。
+- 控制面固定为单 `ray_direct` job；作者 low 只做 8→3 GPU、batch 64→48、mini batch 16→12 的显式拓扑适配。
+- 修复 packed actor Stage 4 probe tensor 恢复，并补齐三 worker allocator、GPU utilization、step/probe 开销和 checkpoint/resume 证据。
+- 本地静态与单元验证完成后仍保持 `TARGET_RUNTIME_EXECUTION_REQUIRED`；目标机命令与决策见 `../cairn/3gpu-runtime-packaging.md` 和 `../../docs/3GPU_RUNBOOK.md`。
+
 ## 2026-08-11 · 修正 Kaggle 数据集挂载路径
 
 - 已运行 notebook 的首个阻塞为用户新增 `cp` 单元缺少递归参数，导致 `/kaggle/working/data` 中不存在 train/validation parquet，训练未启动并按设计输出 0/29。

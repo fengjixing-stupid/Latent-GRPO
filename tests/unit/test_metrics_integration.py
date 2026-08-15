@@ -89,6 +89,45 @@ class DurableMetricsIntegrationTests(unittest.TestCase):
             non_driver.start_run()
         non_driver.close()
 
+    def test_actor_update_persists_two_steps_of_rank_local_gpu_memory(self) -> None:
+        observer = self._observer()
+        observer.start_run()
+        first = self._actor_update(1, workers=3)
+        first["gpu_memory_by_worker"] = [
+            {
+                "worker_rank": rank,
+                "device_index": rank,
+                "current_allocated_bytes": 100 + rank,
+                "current_reserved_bytes": 200 + rank,
+                "peak_allocated_bytes": 300 + rank,
+                "peak_reserved_bytes": 400 + rank,
+            }
+            for rank in range(3)
+        ]
+        observer.emit("actor_update", first)
+        second = self._actor_update(2, workers=3)
+        second["gpu_memory_by_worker"] = [
+            {**row, "current_allocated_bytes": int(row["current_allocated_bytes"]) + 10}
+            for row in first["gpu_memory_by_worker"]
+        ]
+        observer.emit("actor_update", second)
+        observer.close()
+
+        payload = json.loads((self.root / "gpu_runtime_metrics.json").read_text(encoding="utf-8"))
+        self.assertEqual([row["global_step"] for row in payload["steps"]], [1, 2])
+        self.assertTrue(all(len(row["workers"]) == 3 for row in payload["steps"]))
+
+    def test_actor_update_rejects_incomplete_gpu_memory_when_declared(self) -> None:
+        from latent_grpo_runner.metrics.integration import ObserverIntegrationError
+
+        observer = self._observer()
+        observer.start_run()
+        event = self._actor_update(1, workers=3)
+        event["gpu_memory_by_worker"] = [{"worker_rank": 0}]
+        with self.assertRaises(ObserverIntegrationError):
+            observer.emit("actor_update", event)
+        observer.close()
+
     def test_checkpoint_resume_restores_optimizer_step_and_quarantines_future_part(self) -> None:
         observer = self._observer()
         observer.start_run()
@@ -155,7 +194,20 @@ class DurableMetricsIntegrationTests(unittest.TestCase):
             credit_autograd_executed=False,
             probe_rng_restore_succeeded=True,
         )
-        observer.emit("checkpoint_probe", {"rows": [probe_row], "benchmark": probe_benchmark})
+        observer.emit(
+            "checkpoint_probe",
+            {
+                "rows": [probe_row],
+                "benchmark": probe_benchmark,
+                "worker_runtime": [
+                    {
+                        "worker_rank": 0,
+                        "probe_extra_time_seconds": 0.25,
+                        "probe_peak_memory_bytes": 4096,
+                    }
+                ],
+            },
+        )
 
         support_part = next((self.root / "support_metrics").glob("part-*.parquet"))
         support_record = JsonBackend().read(support_part)["rows"][0]
@@ -164,6 +216,8 @@ class DurableMetricsIntegrationTests(unittest.TestCase):
         probe_record = JsonBackend().read(probe_part)["rows"][0]
         self.assertEqual(probe_record["observation_phase"], "checkpoint_probe")
         self.assertEqual(probe_record["credit_concentration_unavailable_reason"], "disabled_by_config")
+        probe_runtime = json.loads((self.root / "probe_worker_runtime.json").read_text(encoding="utf-8"))
+        self.assertEqual(probe_runtime["checkpoints"][0]["workers"][0]["probe_peak_memory_bytes"], 4096)
         observer.close()
 
     def test_resume_requires_matching_sidecar_and_schema(self) -> None:

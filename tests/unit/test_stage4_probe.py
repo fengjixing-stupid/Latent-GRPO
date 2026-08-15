@@ -4,6 +4,35 @@ import unittest
 
 
 class Stage4ProbeTests(unittest.TestCase):
+    def test_packed_probe_tensors_restore_response_layout_and_keep_autograd(self) -> None:
+        import torch
+
+        from latent_grpo_runner.metrics.probe import restore_packed_probe_tensors
+
+        values = torch.tensor(
+            [[1.0, 2.0], [3.0, 4.0], [5.0, 6.0], [7.0, 8.0]],
+            requires_grad=True,
+        )
+        packed = {
+            "topk_log_probs": values,
+            "raw_diff": values + 10.0,
+            "flipgrad_trigger_mask": torch.tensor(
+                [[False, True], [True, False], [False, False], [True, True]]
+            ),
+        }
+        restored = restore_packed_probe_tensors(
+            packed,
+            indices=torch.tensor([0, 1, 3, 4]),
+            batch=2,
+            seqlen=3,
+            response_length=1,
+        )
+
+        self.assertTrue(torch.equal(restored["topk_log_probs"], torch.tensor([[[3.0, 4.0]], [[7.0, 8.0]]])))
+        self.assertTrue(torch.equal(restored["raw_diff"], torch.tensor([[[13.0, 14.0]], [[17.0, 18.0]]])))
+        restored["topk_log_probs"].sum().backward()
+        self.assertTrue(torch.equal(values.grad, torch.tensor([[0.0, 0.0], [1.0, 1.0], [0.0, 0.0], [1.0, 1.0]])))
+
     def test_onesided_probe_metrics_use_reduced_stats_and_exact_p05(self) -> None:
         from latent_grpo_runner.metrics.probe import build_probe_metric_row
 

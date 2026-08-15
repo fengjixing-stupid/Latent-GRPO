@@ -86,6 +86,7 @@ class SamplingBatchInfo:
     # # Gumbel-softmax sampling parameters
     add_noise_gumbel_softmax: torch.Tensor = None
     use_one_sided_gumbel_noise: torch.Tensor = None
+    one_sided_gumbel_deltas: Optional[torch.Tensor] = None
     noise_scales: Optional[torch.Tensor] = None
     gumbel_softmax_temperatures: Optional[torch.Tensor] = None
     # ==========
@@ -160,6 +161,10 @@ class SamplingBatchInfo:
             dtype=torch.bool,
             device=device,
         )
+        one_sided_gumbel_deltas = torch.tensor(
+            [r.sampling_params.one_sided_gumbel_delta for r in reqs],
+            dtype=torch.float,
+        ).view(-1, 1).to(device, non_blocking=True)
         # ==========
         # end of latent reasoning
         # ==========
@@ -255,6 +260,7 @@ class SamplingBatchInfo:
             gumbel_softmax_temperatures=gumbel_softmax_temperatures,
             add_noise_gumbel_softmax=add_noise_gumbel_softmax,
             use_one_sided_gumbel_noise=use_one_sided_gumbel_noise,
+            one_sided_gumbel_deltas=one_sided_gumbel_deltas,
             # ==========
             # end of latent reasoning
             # ==========
@@ -348,6 +354,7 @@ class SamplingBatchInfo:
             filter_list.append("gumbel_softmax_temperatures")
             filter_list.append("add_noise_gumbel_softmax")
             filter_list.append("use_one_sided_gumbel_noise")
+            filter_list.append("one_sided_gumbel_deltas")
         # ==========
         # end of latent reasoning
         # ==========
@@ -464,6 +471,7 @@ class SamplingBatchInfo:
             merge_list.append("gumbel_softmax_temperatures")
             merge_list.append("add_noise_gumbel_softmax")
             merge_list.append("use_one_sided_gumbel_noise")
+            merge_list.append("one_sided_gumbel_deltas")
         # ==========
         # end of latent reasoning
         # ==========

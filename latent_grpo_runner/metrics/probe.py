@@ -7,7 +7,7 @@ import copy
 import math
 import random
 import time
-from typing import Any, Callable, Iterable, Sequence, TypeVar
+from typing import Any, Callable, Iterable, Mapping, Sequence, TypeVar
 
 from .aggregators import SufficientStats
 
@@ -44,6 +44,33 @@ class PreservedProbeResult:
     value: T
     state_restored: bool
     cuda_rng_checked: bool
+
+
+def restore_packed_probe_tensors(
+    packed: Mapping[str, Any],
+    *,
+    indices: Any,
+    batch: int,
+    seqlen: int,
+    response_length: int,
+) -> dict[str, Any]:
+    """Restore packed next-token probe tensors without detaching their graph."""
+    if batch < 1 or seqlen < 2 or not 0 < response_length < seqlen:
+        raise ValueError("invalid packed probe output dimensions")
+    required = {"topk_log_probs", "raw_diff", "flipgrad_trigger_mask"}
+    if set(packed) != required:
+        raise ValueError("packed probe tensor fields are incomplete")
+    restored: dict[str, Any] = {}
+    for name in sorted(required):
+        values = packed[name]
+        if values.dim() < 2 or values.size(0) != indices.numel():
+            raise ValueError("packed probe tensor does not align with unpadding indices")
+        flat_shape = (batch * seqlen, *values.shape[1:])
+        full = values.new_zeros(flat_shape).index_copy(0, indices, values)
+        restored[name] = full.view(batch, seqlen, *values.shape[1:])[
+            :, -response_length - 1 : -1
+        ].contiguous()
+    return restored
 
 
 def build_probe_metric_row(
@@ -548,7 +575,15 @@ def build_checkpoint_probe_event(
         record_unavailable_reason=None if all(state.values()) else "state_preservation_failed",
         state_preservation=state,
     )
-    return {"rows": output_rows, "benchmark": benchmark}
+    worker_runtime = [
+        {
+            "worker_rank": int(packet["worker_rank"]),
+            "probe_extra_time_seconds": float(packet["probe_extra_time_seconds"]),
+            "probe_peak_memory_bytes": int(packet["probe_peak_memory_bytes"]),
+        }
+        for packet in rows
+    ]
+    return {"rows": output_rows, "benchmark": benchmark, "worker_runtime": worker_runtime}
 
 
 def _common_mask_names(packets: Sequence[dict[str, object]], field: str) -> list[str]:

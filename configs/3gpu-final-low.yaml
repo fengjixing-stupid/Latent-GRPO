@@ -1,0 +1,90 @@
+schema_version: 1
+profile_name: 3gpu-final-low
+profile_kind: formal_training
+description: Author-faithful GSM8K training with only documented three-GPU topology adaptations.
+launcher:
+  mode: ray_direct
+target_hardware:
+  required_gpus: 3
+  min_vram_gb: 40
+batch:
+  prompt_batch: 48
+  rollout_n: 8
+  mini_prompt_batch: 12
+  actor_micro_batch_per_gpu: 2
+  rollout_log_prob_micro_batch_per_gpu: 2
+  ref_log_prob_micro_batch_per_gpu: 2
+  ppo_epochs: 1
+model:
+  path: DJCheng/LLaMA3.2-1B-Instruct-Latent-SFT-Top10
+  latent_end_token_id: 524
+  latent_end_token: "</think>"
+  latent_end_source: author_shell_requires_target_tokenizer_validation
+  use_remove_padding: true
+  enable_gradient_checkpointing: false
+  actor_param_offload: false
+  actor_optimizer_offload: false
+  ref_param_offload: false
+  use_kl_loss: false
+data:
+  train_files: data/GSM8k-Aug-oss-dup-all.parquet
+  val_files: data/GSM8k-Aug-test.parquet
+  max_prompt_length: 192
+  max_response_length: 128
+  filter_overlong_prompts: true
+rollout:
+  name: sglang
+  dtype: bfloat16
+  tensor_parallel_size: 1
+  sequence_parallel_size: 1
+  max_model_len: 1024
+  max_num_batched_tokens: 2048
+  gpu_memory_utilization: 0.6
+  max_topk: 10
+  temperature: 0.6
+  top_p: 0.95
+  top_k: 30
+  gumbel_softmax_temperature: 1.0
+  noise_scale: 1.0
+  enable_latent: true
+  add_noise_gumbel_softmax: true
+  use_one_sided_gumbel_noise: true
+  one_sided_gumbel_delta: 0.0
+training:
+  max_steps: 2
+  seed: 17
+  filter_groups_max_num_gen_batches: 50
+paths:
+  upstream_repo_path: Latent-GRPO
+  output_root: artifacts/runs/3gpu-final-low
+  cache_root: cache
+features:
+  metrics_enabled: true
+  support_enabled: true
+  checkpoint_probe_enabled: true
+  credit_probe_enabled: true
+upstream_overrides:
+  data.val_batch_size: 128
+  actor_rollout_ref.actor.optim.lr: "1e-6"
+  actor_rollout_ref.actor.ppo_max_token_len_per_gpu: 2048
+  actor_rollout_ref.actor.kl_loss_coef: 0.001
+  actor_rollout_ref.actor.neg_adv_weight: 1.0
+  actor_rollout_ref.actor.kl_loss_type: low_var_kl
+  actor_rollout_ref.actor.entropy_coeff: 0
+  actor_rollout_ref.actor.freeze_embedding: true
+  actor_rollout_ref.rollout.val_kwargs.do_sample: true
+  actor_rollout_ref.rollout.val_kwargs.temperature: 0.6
+  actor_rollout_ref.rollout.val_kwargs.top_p: 0.95
+  actor_rollout_ref.rollout.val_kwargs.top_k: 30
+  actor_rollout_ref.ref.strategy: fsdp2
+  algorithm.use_kl_in_reward: false
+  algorithm.exclude_overlong_samples_from_advantage: false
+  trainer.critic_warmup: 0
+  trainer.logger: "[console,wandb]"
+  trainer.project_name: latent-grpo
+  trainer.experiment_name: latent-grpo-gsm8k-llama3-3gpu
+  trainer.val_before_train: true
+  trainer.save_freq: 40
+  trainer.test_freq: 10
+  trainer.balance_batch: true
+  trainer.total_epochs: 10

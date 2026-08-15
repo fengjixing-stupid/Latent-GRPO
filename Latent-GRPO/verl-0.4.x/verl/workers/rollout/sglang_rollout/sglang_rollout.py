@@ -451,6 +451,7 @@ class SGLangRollout(BaseRollout):
             gumbel_softmax_temperature=self.config.get("gumbel_softmax_temperature", 1.0),
             add_noise_gumbel_softmax=self.config.get("add_noise_gumbel_softmax", True),
             use_one_sided_gumbel_noise=self.config.get("use_one_sided_gumbel_noise", False),
+            one_sided_gumbel_delta=self.config.get("one_sided_gumbel_delta", 0.0),
             noise_scale=self.config.get("noise_scale", 1.0),
             presence_penalty=0.0,
             frequency_penalty=0.0,

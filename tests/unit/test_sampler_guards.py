@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import ast
+import dataclasses
+import math
 from pathlib import Path
+import threading
 from types import SimpleNamespace
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import unittest
 
 from latent_grpo_runner.upstream_adapter import (
@@ -295,6 +299,147 @@ class SamplerGuardTests(unittest.TestCase):
         self.assertIn("latent_end_token_id = self.latent_end_token_id", scheduler)
         self.assertIn("self.sampling_params.latent_end_token_id = latent_end_token_id", schedule_batch)
         self.assertIn('global_server_args_dict.get("latent_end_token_id")', sampler)
+
+    def test_one_sided_gumbel_delta_reaches_sampler_batch_and_validates_requests(self) -> None:
+        ppo_config = _source("verl-0.4.x/verl/trainer/config/ppo_trainer.yaml")
+        rollout = _source("verl-0.4.x/verl/workers/rollout/sglang_rollout/sglang_rollout.py")
+        params = _source("sglang_latent_reasoning_pkg/python/sglang/srt/sampling/sampling_params.py")
+        batch = _source("sglang_latent_reasoning_pkg/python/sglang/srt/sampling/sampling_batch_info.py")
+
+        self.assertIn("one_sided_gumbel_delta: 0.0", ppo_config)
+        self.assertIn(
+            'one_sided_gumbel_delta=self.config.get("one_sided_gumbel_delta", 0.0)',
+            rollout,
+        )
+        self.assertIn("self.one_sided_gumbel_delta = one_sided_gumbel_delta", params)
+        self.assertIn("one_sided_gumbel_deltas=one_sided_gumbel_deltas", batch)
+        self.assertIn('filter_list.append("one_sided_gumbel_deltas")', batch)
+        self.assertIn('merge_list.append("one_sided_gumbel_deltas")', batch)
+
+        tree = ast.parse(params)
+        class_node = next(
+            item for item in tree.body if isinstance(item, ast.ClassDef) and item.name == "SamplingParams"
+        )
+        module = ast.Module(body=[class_node], type_ignores=[])
+        namespace = {
+            "Any": Any,
+            "Dict": Dict,
+            "List": List,
+            "Optional": Optional,
+            "Union": Union,
+            "_SAMPLING_EPS": 1e-6,
+            "math": math,
+            "torch": __import__("torch"),
+        }
+        exec(compile(ast.fix_missing_locations(module), "sampling_params.py", "exec"), namespace)
+        sampling_params = namespace["SamplingParams"]
+
+        valid = sampling_params(one_sided_gumbel_delta=0.001)
+        valid.verify()
+        self.assertEqual(valid.one_sided_gumbel_delta, 0.001)
+
+        legacy_positional = sampling_params(
+            128,
+            None,
+            None,
+            0.7,
+            0.9,
+            30,
+            0.05,
+            524,
+            0.8,
+            0.6,
+            True,
+            True,
+            1.25,
+            -0.5,
+            1.1,
+            2,
+            3,
+            None,
+            None,
+            None,
+            None,
+            False,
+            False,
+            True,
+            False,
+            {"legacy": True},
+        )
+        self.assertEqual(legacy_positional.frequency_penalty, 1.25)
+        self.assertEqual(legacy_positional.presence_penalty, -0.5)
+        self.assertEqual(legacy_positional.repetition_penalty, 1.1)
+        self.assertEqual(legacy_positional.custom_params, {"legacy": True})
+        self.assertEqual(legacy_positional.one_sided_gumbel_delta, 0.0)
+
+        for invalid in (True, "0.001", -0.001, float("nan"), float("inf")):
+            with self.assertRaisesRegex(ValueError, "must be finite and non-negative"):
+                sampling_params(one_sided_gumbel_delta=invalid).verify()
+
+    def test_one_sided_gumbel_delta_batch_filter_and_merge_preserve_per_request_values(self) -> None:
+        torch = __import__("torch")
+        source = _source("sglang_latent_reasoning_pkg/python/sglang/srt/sampling/sampling_batch_info.py")
+        tree = ast.parse(source)
+        class_node = next(
+            item for item in tree.body if isinstance(item, ast.ClassDef) and item.name == "SamplingBatchInfo"
+        )
+        module = ast.Module(body=[class_node], type_ignores=[])
+        namespace = {
+            "Any": Any,
+            "Callable": Callable,
+            "CustomLogitProcessor": object,
+            "Dict": Dict,
+            "List": List,
+            "Optional": Optional,
+            "ScheduleBatch": object,
+            "Tuple": Tuple,
+            "dataclasses": dataclasses,
+            "penaltylib": SimpleNamespace(BatchedPenalizerOrchestrator=object),
+            "threading": threading,
+            "torch": torch,
+        }
+        exec(compile(ast.fix_missing_locations(module), "sampling_batch_info.py", "exec"), namespace)
+        batch_info = namespace["SamplingBatchInfo"]
+
+        class Orchestrator:
+            def filter(self, indices):
+                self.filtered = indices
+
+            def merge(self, other):
+                self.merged = other
+
+        def build(deltas):
+            size = len(deltas)
+            return batch_info(
+                temperatures=torch.ones((size, 1)),
+                top_ps=torch.ones(size),
+                top_ks=torch.ones(size, dtype=torch.int32),
+                min_ps=torch.zeros(size),
+                is_all_greedy=False,
+                need_min_p_sampling=False,
+                vocab_size=8,
+                penalizer_orchestrator=Orchestrator(),
+                device="cpu",
+                enable_latent=True,
+                latent_modes=torch.ones(size, dtype=torch.bool),
+                noise_scales=torch.ones((size, 1)),
+                gumbel_softmax_temperatures=torch.ones((size, 1)),
+                add_noise_gumbel_softmax=torch.ones(size, dtype=torch.bool),
+                use_one_sided_gumbel_noise=torch.ones(size, dtype=torch.bool),
+                one_sided_gumbel_deltas=torch.tensor(deltas, dtype=torch.float32).view(-1, 1),
+            )
+
+        left = build([0.1, 0.2])
+        left.filter_batch([1], torch.tensor([1]))
+        self.assertEqual(tuple(left.one_sided_gumbel_deltas.shape), (1, 1))
+        self.assertEqual(left.one_sided_gumbel_deltas.dtype, torch.float32)
+        self.assertTrue(torch.allclose(left.one_sided_gumbel_deltas, torch.tensor([[0.2]])))
+
+        left.merge_batch(build([0.3]))
+        self.assertEqual(tuple(left.one_sided_gumbel_deltas.shape), (2, 1))
+        self.assertTrue(
+            torch.allclose(left.one_sided_gumbel_deltas, torch.tensor([[0.2], [0.3]]))
+        )
 
     def test_sglang_target_backend_keeps_explicit_package_fail_fast_checks(self) -> None:
         source = _source("verl-0.4.x/verl/workers/rollout/sglang_rollout/sglang_rollout.py")
