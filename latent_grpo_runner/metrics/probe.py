@@ -46,6 +46,26 @@ class PreservedProbeResult:
     cuda_rng_checked: bool
 
 
+def restore_packed_probe_tensor(
+    values: Any,
+    *,
+    indices: Any,
+    batch: int,
+    seqlen: int,
+    response_length: int,
+) -> Any:
+    """Restore one packed next-token tensor to ``[batch, response, ...]``."""
+    if batch < 1 or seqlen < 2 or not 0 < response_length < seqlen:
+        raise ValueError("invalid packed probe output dimensions")
+    if values.dim() < 2 or values.size(0) != indices.numel():
+        raise ValueError("packed probe tensor does not align with unpadding indices")
+    flat_shape = (batch * seqlen, *values.shape[1:])
+    full = values.new_zeros(flat_shape).index_copy(0, indices, values)
+    return full.view(batch, seqlen, *values.shape[1:])[
+        :, -response_length - 1 : -1
+    ].contiguous()
+
+
 def restore_packed_probe_tensors(
     packed: Mapping[str, Any],
     *,
@@ -54,23 +74,20 @@ def restore_packed_probe_tensors(
     seqlen: int,
     response_length: int,
 ) -> dict[str, Any]:
-    """Restore packed next-token probe tensors without detaching their graph."""
-    if batch < 1 or seqlen < 2 or not 0 < response_length < seqlen:
-        raise ValueError("invalid packed probe output dimensions")
+    """Restore packed next-token probe values without detaching their graph."""
     required = {"topk_log_probs", "raw_diff", "flipgrad_trigger_mask"}
     if set(packed) != required:
         raise ValueError("packed probe tensor fields are incomplete")
-    restored: dict[str, Any] = {}
-    for name in sorted(required):
-        values = packed[name]
-        if values.dim() < 2 or values.size(0) != indices.numel():
-            raise ValueError("packed probe tensor does not align with unpadding indices")
-        flat_shape = (batch * seqlen, *values.shape[1:])
-        full = values.new_zeros(flat_shape).index_copy(0, indices, values)
-        restored[name] = full.view(batch, seqlen, *values.shape[1:])[
-            :, -response_length - 1 : -1
-        ].contiguous()
-    return restored
+    return {
+        name: restore_packed_probe_tensor(
+            packed[name],
+            indices=indices,
+            batch=batch,
+            seqlen=seqlen,
+            response_length=response_length,
+        )
+        for name in sorted(required)
+    }
 
 
 def build_probe_metric_row(
@@ -342,6 +359,8 @@ def collect_checkpoint_probe_packet(
     model: Any,
     optimizer: Any,
     flipgrad_trigger_mask: Any | None = None,
+    autograd_topk_log_probs: Any | None = None,
+    autograd_restore_spec: Mapping[str, Any] | None = None,
     retain_graph: bool = True,
 ) -> dict[str, object]:
     """Run one bounded credit autograd and return a Ray-safe worker packet."""
@@ -379,15 +398,33 @@ def collect_checkpoint_probe_packet(
         if torch.cuda.is_available()
         else None
     )
+    use_packed_autograd_target = autograd_topk_log_probs is not None
+    if use_packed_autograd_target:
+        if autograd_restore_spec is None:
+            raise ValueError("packed autograd target requires a restore specification")
+        required_restore_keys = {"indices", "batch", "seqlen", "response_length"}
+        if set(autograd_restore_spec) != required_restore_keys:
+            raise ValueError("packed autograd restore specification is incomplete")
+        if not getattr(autograd_topk_log_probs, "requires_grad", False):
+            raise ValueError("autograd_topk_log_probs must require grad")
+    elif autograd_restore_spec is not None:
+        raise ValueError("autograd restore specification requires a packed target")
+
+    autograd_target = autograd_topk_log_probs if use_packed_autograd_target else topk_log_probs
     peak_before = torch.cuda.max_memory_allocated() if torch.cuda.is_available() else 0
     started = time.perf_counter()
     try:
         gradients = torch.autograd.grad(
             policy_loss,
-            topk_log_probs,
+            autograd_target,
             retain_graph=retain_graph,
             create_graph=False,
         )[0]
+        if use_packed_autograd_target:
+            gradients = restore_packed_probe_tensor(
+                gradients,
+                **autograd_restore_spec,
+            )
     finally:
         model.train(module_mode_before)
         random.setstate(python_rng_before)

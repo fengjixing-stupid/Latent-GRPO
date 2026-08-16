@@ -500,6 +500,20 @@ class DataParallelPPOActor(BasePPOActor):
                         seqlen=seqlen,
                         response_length=response_length,
                     )
+                    # ``policy_loss`` depends on the packed tensor used to build
+                    # ``log_probs``.  The restored tensor above is a downstream
+                    # view/copy and therefore is not an autograd ancestor of the
+                    # loss.  Keep the graph-connected packed target and enough
+                    # metadata to restore its gradient to response layout.
+                    checkpoint_probe_tensors["autograd_topk_log_probs"] = (
+                        packed_checkpoint_tensors["topk_log_probs"]
+                    )
+                    checkpoint_probe_tensors["autograd_restore_spec"] = {
+                        "indices": indices,
+                        "batch": batch_size,
+                        "seqlen": seqlen,
+                        "response_length": response_length,
+                    }
                 safe_gather_ids = topk_ids_rmpad_rolled.clone()
                 safe_gather_ids[safe_gather_ids == -100] = 0
 
@@ -1010,6 +1024,12 @@ class DataParallelPPOActor(BasePPOActor):
                                 flipgrad_trigger_mask=checkpoint_tensors[
                                     "flipgrad_trigger_mask"
                                 ],
+                                autograd_topk_log_probs=checkpoint_tensors.get(
+                                    "autograd_topk_log_probs"
+                                ),
+                                autograd_restore_spec=checkpoint_tensors.get(
+                                    "autograd_restore_spec"
+                                ),
                                 retain_graph=True,
                             )
                         )

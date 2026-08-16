@@ -33,6 +33,62 @@ class Stage4ProbeTests(unittest.TestCase):
         restored["topk_log_probs"].sum().backward()
         self.assertTrue(torch.equal(values.grad, torch.tensor([[0.0, 0.0], [1.0, 1.0], [0.0, 0.0], [1.0, 1.0]])))
 
+    def test_checkpoint_packet_uses_packed_autograd_target_then_restores_credit(self) -> None:
+        import torch
+
+        from latent_grpo_runner.metrics.probe import (
+            collect_checkpoint_probe_packet,
+            restore_packed_probe_tensors,
+        )
+
+        model = torch.nn.Linear(2, 1)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+        packed = torch.tensor(
+            [[-0.1, -0.2], [-0.3, -0.4], [-0.5, -0.6], [-0.7, -0.8]],
+            requires_grad=True,
+        )
+        coefficients = torch.tensor(
+            [[11.0, 12.0], [21.0, 22.0], [31.0, 32.0], [41.0, 42.0]]
+        )
+        policy_loss = -(packed * coefficients).sum()
+        indices = torch.tensor([0, 1, 3, 4])
+        restore_spec = {
+            "indices": indices,
+            "batch": 2,
+            "seqlen": 3,
+            "response_length": 1,
+        }
+        restored = restore_packed_probe_tensors(
+            {
+                "topk_log_probs": packed,
+                "raw_diff": packed.detach() + 1.0,
+                "flipgrad_trigger_mask": torch.zeros_like(packed, dtype=torch.bool),
+            },
+            **restore_spec,
+        )
+        shape = restored["topk_log_probs"].shape
+        packet = collect_checkpoint_probe_packet(
+            policy_loss=policy_loss,
+            topk_log_probs=restored["topk_log_probs"],
+            deltas=restored["raw_diff"],
+            mixture_weights=torch.full(shape, 0.5),
+            valid_component_mask=torch.ones(shape, dtype=torch.bool),
+            advantages=torch.ones(shape),
+            trajectory_masks={"all": torch.ones(shape, dtype=torch.bool)},
+            position_masks={"all": torch.ones(shape, dtype=torch.bool)},
+            model=model,
+            optimizer=optimizer,
+            flipgrad_trigger_mask=restored["flipgrad_trigger_mask"],
+            autograd_topk_log_probs=packed,
+            autograd_restore_spec=restore_spec,
+            retain_graph=True,
+        )
+
+        self.assertEqual(packet["credit"], [21.0, 22.0, 41.0, 42.0])
+        self.assertTrue(packet["credit_autograd_executed"])
+        self.assertTrue(all(packet["state_preservation"].values()))
+        policy_loss.backward()
+
     def test_onesided_probe_metrics_use_reduced_stats_and_exact_p05(self) -> None:
         from latent_grpo_runner.metrics.probe import build_probe_metric_row
 
