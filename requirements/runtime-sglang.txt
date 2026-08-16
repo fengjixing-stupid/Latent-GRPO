@@ -8,7 +8,7 @@ requests
 tqdm
 setproctitle
 ipython
-compressed-tensors
+compressed-tensors==0.11.0
 # decord is intentionally excluded from the Python 3.11 text-only runtime; install it only for optional video/multimodal workloads.
 fastapi
 hf-transfer

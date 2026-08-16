@@ -1,14 +1,14 @@
 # Direct Python dependencies evidenced by Latent-GRPO/verl-0.4.x/setup.py
 # and imports in the audited training path.  Unpinned entries intentionally
 # remain resolver candidates until the Linux target-machine lock is verified.
-accelerate
+accelerate==1.10.1
 codetiming
-datasets
-dill
+datasets==4.1.1
+dill==0.4.0
 hydra-core
 numpy<2.0.0
 pandas
-peft
+peft==0.17.1
 pybind11
 PyYAML
 ray[default]>=2.41.0
