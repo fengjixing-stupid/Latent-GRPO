@@ -104,11 +104,43 @@ def main(argv: list[str] | None = None) -> int:
     except (ConfigError, ModuleNotFoundError, OSError, ValueError) as error:
         print(f"latent_end_validation_error: {error}", file=sys.stderr)
         return 4
+    if config.features.metrics_enabled:
+        from latent_grpo_runner.run_metadata import write_run_start_metadata
+
+        write_run_start_metadata(
+            output_root=config.paths["output_root"],
+            profile_name=config.profile_name,
+            profile_kind=config.profile_kind,
+            seed=config.training.seed,
+            config_hash=config.config_hash,
+            resume_compatibility_hash=config.resume_compatibility_hash,
+            resolved_config=config._hashable_mapping(),
+            platform_snapshot=target_report,
+        )
     try:
-        return launch(config)
+        exit_code = launch(config)
     except RuntimeError as error:
+        if config.features.metrics_enabled:
+            from latent_grpo_runner.run_metadata import write_run_terminal_status
+
+            write_run_terminal_status(
+                output_root=config.paths["output_root"],
+                status="failed",
+                error_type=type(error).__name__,
+                error_message=str(error),
+            )
         print(f"launch_blocked: {error}", file=sys.stderr)
         return 5
+    if config.features.metrics_enabled:
+        from latent_grpo_runner.run_metadata import write_run_terminal_status
+
+        write_run_terminal_status(
+            output_root=config.paths["output_root"],
+            status="completed" if exit_code == 0 else "failed",
+            error_type=None if exit_code == 0 else "UpstreamExitCode",
+            error_message=None if exit_code == 0 else f"upstream exited with code {exit_code}",
+        )
+    return exit_code
 
 
 if __name__ == "__main__":
