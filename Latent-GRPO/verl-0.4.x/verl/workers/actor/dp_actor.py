@@ -190,6 +190,12 @@ class DataParallelPPOActor(BasePPOActor):
         )
 
     def consume_latent_grpo_observer_facts(self):
+        # Observer-off training must not export worker observer packets.
+        # last_update_count / last_update_did_step remain available to the
+        # scheduler independently of this optional metrics payload.
+        if not self._latent_grpo_observer_enabled:
+            return {}
+
         facts = {
             "did_step": bool(self.last_update_did_step),
             "did_update": bool(self.last_update_did_step),
