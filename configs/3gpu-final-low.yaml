@@ -1,7 +1,8 @@
 schema_version: 1
 profile_name: 3gpu-final-low
 profile_kind: formal_training
-description: Author-faithful GSM8K training with only documented three-GPU topology adaptations.
+description: Author-faithful GSM8K training with only documented three-GPU topology
+  adaptations.
 launcher:
   mode: ray_direct
 target_hardware:
@@ -11,14 +12,14 @@ batch:
   prompt_batch: 48
   rollout_n: 8
   mini_prompt_batch: 12
-  actor_micro_batch_per_gpu: 2
-  rollout_log_prob_micro_batch_per_gpu: 2
+  actor_micro_batch_per_gpu: 16
+  rollout_log_prob_micro_batch_per_gpu: 64
   ref_log_prob_micro_batch_per_gpu: 2
   ppo_epochs: 1
 model:
   path: DJCheng/LLaMA3.2-1B-Instruct-Latent-SFT-Top10
   latent_end_token_id: 524
-  latent_end_token: "</think>"
+  latent_end_token: </think>
   latent_end_source: author_shell_requires_target_tokenizer_validation
   use_remove_padding: true
   enable_gradient_checkpointing: false
@@ -39,7 +40,7 @@ rollout:
   sequence_parallel_size: 1
   max_model_len: 1024
   max_num_batched_tokens: 2048
-  gpu_memory_utilization: 0.6
+  gpu_memory_utilization: 0.5
   max_topk: 10
   temperature: 0.6
   top_p: 0.95
@@ -58,13 +59,13 @@ paths:
   output_root: artifacts/runs/3gpu-final-low
   cache_root: cache
 features:
-  metrics_enabled: true
-  support_enabled: true
-  checkpoint_probe_enabled: true
-  credit_probe_enabled: true
+  metrics_enabled: false
+  support_enabled: false
+  checkpoint_probe_enabled: false
+  credit_probe_enabled: false
 upstream_overrides:
   data.val_batch_size: 128
-  actor_rollout_ref.actor.optim.lr: "1e-6"
+  actor_rollout_ref.actor.optim.lr: 1e-6
   actor_rollout_ref.actor.ppo_max_token_len_per_gpu: 2048
   actor_rollout_ref.actor.kl_loss_coef: 0.001
   actor_rollout_ref.actor.neg_adv_weight: 1.0
@@ -79,11 +80,11 @@ upstream_overrides:
   algorithm.use_kl_in_reward: false
   algorithm.exclude_overlong_samples_from_advantage: false
   trainer.critic_warmup: 0
-  trainer.logger: "[console,wandb]"
+  trainer.logger: '[console]'
   trainer.project_name: latent-grpo
-  trainer.experiment_name: latent-grpo-gsm8k-llama3-3gpu
-  trainer.val_before_train: true
-  trainer.save_freq: 40
-  trainer.test_freq: 10
+  trainer.experiment_name: latent-grpo-gsm8k-llama3-3gpu-max-throughput
+  trainer.val_before_train: false
+  trainer.save_freq: 5000
+  trainer.test_freq: -1
   trainer.balance_batch: true
   trainer.total_epochs: 10
