@@ -5,7 +5,7 @@
 ## 1. 给接手大模型的事实边界
 
 - 项目在本轮 3GPU 打包开始时的 Git 基线是 `53438ec07b804ebd1b670d6fe118199798350505`。接手时必须重新执行 `git rev-parse HEAD` 和 `git status --short`，以实际工作树为准。
-- 当前本地开发环境是无 NVIDIA GPU 的 Mac，只能证明配置解析、纯逻辑、shell 语法和 CPU 单元测试。三卡 CUDA、NCCL、BF16、FSDP、SGLang、全设备 CUDA RNG 和真实显存结论仍是 `TARGET_RUNTIME_EXECUTION_REQUIRED`。
+- 源码归档或无 GPU 本地环境只能证明配置解析、纯逻辑、shell 语法和 CPU 单元测试。Low `16/32/0.45` 参数集合已在运行时等价的父提交 `8c9ce49` 完成目标三卡全门禁 validation；任何新的当前 HEAD 仍必须在服务器重新生成 commit-bound `acceptance.json`。High 仍是 `TARGET_RUNTIME_EXECUTION_REQUIRED`。
 - `Latent-GRPO/` 是 vendored 作者实现，外层目录是本项目增加的严格配置、launcher、metrics、验证和 teammate 打包。不要把两层代码混为一个 upstream。
 - 较早的 `docs/progress.md`、审计报告和 decision log 记录的是历史阶段，可能仍写着“尚未实现”。判断当前状态时，以当前源码、测试、final profiles、3GPU 文档和 Cairn 最新记录为准。
 - 目标机 preflight 要求 Git 工作树干净。开发目录中的未提交改动必须先由负责人审阅并形成可复现提交，不能用 reset 或忽略检查绕过。
@@ -36,7 +36,7 @@ train_latent_grpo.py
 → one ray_direct Python driver
 → one Ray runtime/job
 → 3 FSDP actor workers + customized SGLang rollout
-→ driver-owned worker aggregation and append-only metric output
+→ validation/metrics-enabled profile 执行 driver-owned worker aggregation 和 append-only metric output
 ```
 
 不得在外层再套三进程 launcher。三张 GPU 是 Ray/FSDP worker 的资源，不是三个各自启动 trainer 的 outer ranks。
@@ -49,13 +49,12 @@ prompt parquet
 → stable group/trajectory identity
 → reward、dynamic filtering、GRPO advantage
 → FSDP actor forward/backward/optimizer step
-→ 三 worker scalar sufficient statistics
-→ driver authoritative merge
-→ append-only Parquet metrics
-→ checkpoint 时执行有界 Stage 4 probe 并写 sidecar
+→ 若 observer 开启：三 worker scalar sufficient statistics
+→ 若 observer 开启：driver authoritative merge 与 append-only Parquet metrics
+→ 若 probe 开启：checkpoint 时执行有界 Stage 4 probe 并写 sidecar
 ```
 
-probe 可以用 `torch.autograd.grad()` 获取 credit，但必须保持 parameter、optimizer state、训练 `.grad`、Python/NumPy/CPU/CUDA RNG 和 module mode。packed actor path 通过可微 `index_copy` 恢复 probe tensor 到 batch/sequence 域，不能为了省事把作者的 `use_remove_padding=true` 改成 false。
+当前 Low formal 关闭 observer/probe 以减少长跑开销；Low validation 保持全部开启。probe 可以用 `torch.autograd.grad()` 获取 credit，但必须保持 parameter、optimizer state、训练 `.grad`、Python/NumPy/CPU/CUDA RNG 和 module mode。packed actor path 通过可微 `index_copy` 恢复 probe tensor 到 batch/sequence 域，不能为了省事把作者的 `use_remove_padding=true` 改成 false。
 
 ## 4. 仓库地图与权威入口
 
@@ -87,17 +86,17 @@ probe 可以用 `torch.autograd.grad()` 获取 credit，但必须保持 paramete
 |---|---:|---:|---|
 | `trainer.n_gpus_per_node` | 8 | 3 | 目标机器恰好三卡 |
 | `data.train_batch_size` | 64 | 48 | 保持 rollout `n=8` 时满足三 rank 整除 |
-| `actor.ppo_mini_batch_size` | 16 | 12 | 归一化后可被三 rank 和 micro batch 2 整除 |
+| `actor.ppo_mini_batch_size` | 16 | 12 | 每 rank 32 trajectories，可被当前 actor micro 16 整除 |
 
-LR `1e-6`、prompt/response length、rollout `n=8`、Top-K、Gumbel、noise、KL、reward/advantage、FlipGrad、BF16 和 10 epochs 保持作者值。路径、GPU ID、seed、experiment name 是显式运行身份，不伪装成作者参数。
+LR `1e-6`、prompt/response length、rollout `n=8`、Top-K、Gumbel、noise、KL、reward/advantage、FlipGrad、BF16 和 10 epochs 保持作者值。Low 当前还显式采用 `actor_micro=16`、`logprob_micro=32`、SGLang `gpu_memory_utilization=0.45`，并将 formal 的 metrics/support/checkpoint/credit probes 关闭、`save_freq` 改为 5000、周期 eval 关闭。这些是吞吐、显存和运行开销适配，不得写成作者原始值。路径、GPU ID、seed、experiment name 是显式运行身份，不伪装成作者参数。
 
 High 正式 profile 也只做显式拓扑适配：作者 prompt/mini `32/32` 改为 `12/12`，使 `12×8÷3=32` trajectories/rank，恰好保持作者 `32×8÷8=32` 的每 rank 归一化负载。Qwen Math 7B、1024/4096 长度、KL、gradient checkpointing、actor parameter/optimizer offload、SGLang 12000 token 限制、0.8 memory utilization 和 5 epochs 保持作者值。
 
-两个 validation profile 都把 prompt/mini batch 缩到 `3/3`、总步数设为 2、每步 checkpoint，并关闭长 validation；Low/High 各自保持对应模型、数据、长度和算法语义。它们只证明 target runtime 链路，不产生可汇报的正式实验结果。
+Low validation 保持 formal 的 prompt/mini `48/12`、actor/logprob micro `16/32` 和 SGLang `0.45`，只将总步数限制为 2、每步 checkpoint，并重新打开全部 metrics/support/probes。High validation 仍将 prompt/mini `12/12` 缩到 `3/3`。两者都只证明 target runtime 链路，不产生可汇报的正式实验结果。
 
 ## 6. 指标、checkpoint 与验收证据
 
-项目持久化 29 个核心指标，并额外记录 `train/raw_generated_token_count`：
+启用 metrics/probe 的 validation 与 High profile 可持久化 29 个核心指标，并额外记录 `train/raw_generated_token_count`。当前 Low formal 为 observer-off，不保证生成这些表和 sidecar：
 
 | 阶段 | 数量 | 目的 |
 |---|---:|---|
@@ -109,7 +108,7 @@ High 正式 profile 也只做显式拓扑适配：作者 prompt/mini `32/32` 改
 
 三卡验收要求 worker 0/1/2 都产生 rank-local packet，再由 driver 按 sum、sum-of-squares、count、min 和正确 denominator 合并成一个 authoritative row/set。`aggregation_worker_count` 必须为 3，global step 不得重复。
 
-checkpoint 至少包含 actor、`data.pt`、metrics sidecar、optimizer/global step identity 和 compatibility hash。final validation 还会启动新进程做最小 resume load。显存/性能证据包括每卡 `nvidia-smi` memory/utilization、每 worker PyTorch allocated/reserved 当前值与峰值、两个 step time，以及每 worker probe extra time/peak memory。
+validation checkpoint 至少包含 actor、`data.pt`、metrics sidecar、optimizer/global step identity 和 compatibility hash，并会启动新进程做最小 resume load。显存/性能证据包括每卡 `nvidia-smi` memory/utilization、每 worker PyTorch allocated/reserved 当前值与峰值、两个 step time，以及每 worker probe extra time/peak memory。Low formal 因 probe 关闭，不应被要求生成 validation sidecar。
 
 机器验收看 `artifacts/validation/3gpu-final/acceptance.json`，人类摘要看 `ACCEPTANCE_SUMMARY.md`。详细字段与失败日志位置见 [3GPU 验收清单](3GPU_ACCEPTANCE_CHECKLIST.md)。
 
@@ -123,14 +122,7 @@ checkpoint 至少包含 actor、`data.pt`、metrics sidecar、optimizer/global s
 - packed/padded Stage 4、三 worker 聚合、allocator/utilization、checkpoint/resume 的实现与 CPU/纯逻辑测试。
 - shell syntax、Python compile、profile dry-run 和完整 `tests/unit` 本地回归。
 
-仍未由当前 Mac 证明：
-
-- Linux 三张至少 40 GB GPU 的实际型号、驱动和 ABI 组合。
-- BF16/NCCL/FSDP collective、定制 FlashAttention/SGLang kernel 的真实执行。
-- 三个 actor 的 CUDA RNG 恢复、两次真实 optimizer updates、29/29 指标和无 OOM/异常增长。
-- `3GPU_FINAL_GATE: PASS`。
-
-因此正式状态必须保持 `TARGET_RUNTIME_EXECUTION_REQUIRED`。Kaggle 2×T4 的既有指标验证不能替代最终三卡 gate。
+源码包本身仍不能替代目标机证据。Low `16/32/0.45` 在父提交 `8c9ce49` 的三卡 validation 已报告 `29/29`、CUDA RNG、checkpoint/resume 和 `3GPU_FINAL_GATE: PASS`；新提交即使只改测试或文档，也必须现场重新满足 `acceptance.json.git_commit == git rev-parse HEAD`。High 尚未完成同等级目标机验收，因此 High 状态保持 `TARGET_RUNTIME_EXECUTION_REQUIRED`。Kaggle 2×T4 的既有指标验证不能替代任一 final 三卡 gate。
 
 ## 8. 接手后的推荐阅读顺序
 
@@ -148,7 +140,7 @@ checkpoint 至少包含 actor、`data.pt`、metrics sidecar、optimizer/global s
 - 不要把旧 `configs/3gpu-low.yaml` 或 T4 profile 当作者参数真值。
 - 不要为了显存或“稳定性”静默修改 rollout `n`、Top-K、Gumbel、reward、advantage、FlipGrad、长度、LR 或 KL。
 - 不要把 validation profile 的两步结果当正式实验。
-- 不要通过关闭 metrics/support/probe、减少期望 worker 数或放宽 unavailable 字段让 gate 通过。
+- 不要在 validation profile 中关闭 metrics/support/probe、减少期望 worker 数或放宽 unavailable 字段让 gate 通过；Low formal 在 validation PASS 后按已记录配置关闭 observer/probe，不属于绕过 gate。
 - 不要把 worker-local row 当 global row，也不要平均 worker mean；必须合并 sufficient statistics。
 - 不要声称本地 Mac 测试证明 CUDA runtime PASS。
 - 不要覆盖已有 training output；每个 seed 使用独立目录，并保留 manifest、resolved config 和 Git identity。
@@ -159,8 +151,8 @@ checkpoint 至少包含 actor、`data.pt`、metrics sidecar、optimizer/global s
 
 ```text
 请先完整阅读 docs/PROJECT_TECHNICAL_HANDOFF.md，再按其中的权威阅读顺序检查相关源码和测试。
-当前任务必须保持作者公开算法/采样参数，任何 3GPU 变更都只能是显式 topology adaptation。
-不要把 Mac 静态/单元测试当作 CUDA、NCCL、BF16 或三卡 runtime PASS。
+当前任务必须保持作者公开算法/采样参数；任何 3GPU topology、吞吐、显存或运行开销变更都必须显式记录并重新绑定 validation acceptance。
+不要把本地静态/单元测试当作 CUDA、NCCL、BF16 或三卡 runtime PASS；Low 运行结论以当前 HEAD 对应 acceptance 为准。
 开始修改前先报告：当前 Git HEAD/工作树、你认定的 source of truth、受影响的训练语义、计划运行的测试，以及是否需要目标机证据。
 ```
 

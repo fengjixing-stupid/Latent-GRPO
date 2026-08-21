@@ -78,9 +78,11 @@ def test_final_three_gpu_profiles_parse_and_preserve_author_frozen_values() -> N
         assert config.hardware.min_vram_gb == 40
         assert config.rollout.dtype == "bfloat16"
         assert config.batch.rollout_n == 8
+        assert config.batch.actor_micro_batch_per_gpu == 16
+        assert config.batch.rollout_log_prob_micro_batch_per_gpu == 32
         assert config.rollout.max_model_len == 1024
         assert config.rollout.max_num_batched_tokens == 2048
-        assert config.rollout.gpu_memory_utilization == 0.6
+        assert config.rollout.gpu_memory_utilization == 0.45
         assert config.rollout.top_p == 0.95
         assert config.rollout.top_k == 30
         assert config.rollout.max_topk == 10
@@ -91,10 +93,6 @@ def test_final_three_gpu_profiles_parse_and_preserve_author_frozen_values() -> N
         assert config.model.use_remove_padding is True
         assert config.model.enable_gradient_checkpointing is False
         assert config.model.use_kl_loss is False
-        assert config.features.metrics_enabled is True
-        assert config.features.support_enabled is True
-        assert config.features.checkpoint_probe_enabled is True
-        assert config.features.credit_probe_enabled is True
         assert config.batch_arithmetic()[0] % config.batch_arithmetic()[1] == 0
 
         overrides = set(config.author_hydra_overrides())
@@ -115,6 +113,10 @@ def test_final_three_gpu_profiles_parse_and_preserve_author_frozen_values() -> N
     assert final_low.profile_kind == "formal_training"
     assert final_low.batch.prompt_batch == 48
     assert final_low.batch.mini_prompt_batch == 12
+    assert final_low.features.metrics_enabled is False
+    assert final_low.features.support_enabled is False
+    assert final_low.features.checkpoint_probe_enabled is False
+    assert final_low.features.credit_probe_enabled is False
     assert final_low.training.max_steps >= 2
     assert "trainer.total_epochs=10" in final_low.author_hydra_overrides()
     assert not any(
@@ -122,8 +124,12 @@ def test_final_three_gpu_profiles_parse_and_preserve_author_frozen_values() -> N
         for item in final_low.author_hydra_overrides()
     )
     assert validation.profile_kind == "final_runtime_validation"
-    assert validation.batch.prompt_batch == 3
-    assert validation.batch.mini_prompt_batch == 3
+    assert validation.batch.prompt_batch == 48
+    assert validation.batch.mini_prompt_batch == 12
+    assert validation.features.metrics_enabled is True
+    assert validation.features.support_enabled is True
+    assert validation.features.checkpoint_probe_enabled is True
+    assert validation.features.credit_probe_enabled is True
     assert validation.training.max_steps == 2
     assert "trainer.total_training_steps=2" in validation.author_hydra_overrides()
     assert "trainer.save_freq=1" in validation.author_hydra_overrides()

@@ -1,6 +1,6 @@
 # 3GPU 最终验收清单
 
-状态：`TARGET_RUNTIME_EXECUTION_REQUIRED`。基线：`53438ec07b804ebd1b670d6fe118199798350505`。launcher：`ray_direct`。
+状态：Low `16/32/0.45` 参数集合已在运行时等价的父提交 `8c9ce49` 完成目标机 validation；新的当前 HEAD 仍须重新生成 commit-bound acceptance。High 仍为 `TARGET_RUNTIME_EXECUTION_REQUIRED`。基线：`53438ec07b804ebd1b670d6fe118199798350505`。launcher：`ray_direct`。
 
 先运行：
 
@@ -45,7 +45,7 @@ Low 需加 `--config configs/3gpu-final-validation.yaml`，High 需加 `--config
 | [ ] | PyTorch allocator | 两步、每步 rank 0/1/2 都有 allocated/reserved 当前值和峰值 | `run/gpu_runtime_metrics.json`、`acceptance.json.details.gpu_allocator` |
 | [ ] | bounded memory growth | `bounded_second_step_growth == true`；第二步 reserved 增量不超过单卡总显存 25% | `acceptance.json.details.gpu_allocator` |
 | [ ] | step/probe performance | 两个 `train/step_time`；三个 rank 都有 probe extra time/peak memory | `ACCEPTANCE_SUMMARY.md`、`run/probe_worker_runtime.json` |
-| [ ] | SGLang utilization identity | configured memory utilization 为作者 Low `0.6` / High `0.8`，并同时报告 validation 窗口设备 utilization | `acceptance.json.details`、`gpu_telemetry.json` |
+| [ ] | SGLang utilization identity | configured memory utilization 为当前 Low `0.45` / High `0.8`，并同时报告 validation 窗口设备 utilization | `acceptance.json.details`、`gpu_telemetry.json` |
 | [ ] | final gate | `acceptance.json.final_gate == PASS` 和 `3GPU_FINAL_GATE: PASS` | `acceptance.json.blockers` |
 
 Stage 3 的 sufficient statistics 在 driver 持久化前跨三 worker 合并。Stage 4 在三个 actor worker 各生成一个有界 packet，driver 校验 rank 0/1/2 完整后合并为一个 authoritative checkpoint row/set；因此全局 CUDA RNG PASS 表示三个 packet 全部通过各自可见设备的 `get_rng_state_all()` 比较。

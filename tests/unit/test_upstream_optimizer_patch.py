@@ -236,6 +236,22 @@ class UpstreamOptimizerPatchTests(unittest.TestCase):
         self.assertIn('output.meta_info["latent_grpo_observer"]', source)
         self.assertRegex(source, r"if\s+observer_facts\s*:")
 
+    def test_observer_off_consumer_returns_no_worker_packet(self) -> None:
+        consume = _load_standalone_function(ACTOR_PATH, "consume_latent_grpo_observer_facts")
+        subject = type(
+            "Subject",
+            (),
+            {
+                "_latent_grpo_observer_enabled": False,
+                "last_update_count": 3,
+                "last_update_did_step": True,
+            },
+        )()
+
+        self.assertEqual(consume(subject), {})
+        self.assertEqual(subject.last_update_count, 3)
+        self.assertTrue(subject.last_update_did_step)
+
     def test_scheduler_all_skipped_success_and_mixed_semantics(self) -> None:
         advance = _load_standalone_function(WORKER_PATH, "_advance_actor_scheduler_after_update")
 

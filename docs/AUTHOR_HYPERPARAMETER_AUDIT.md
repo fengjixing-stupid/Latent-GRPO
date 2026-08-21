@@ -46,7 +46,7 @@ Git 基线：`53438ec07b804ebd1b670d6fe118199798350505`。
 | `data.filter_overlong_prompts` | true | true | `data.filter_overlong_prompts` | invalid sample masking described | true | no |
 | `actor.optim.lr` | 1e-6 | 1e-6 | `actor_rollout_ref.actor.optim.lr` | 1e-6 | 1e-6 | no |
 | `actor.ppo_mini_batch_size` | 16 | 32 | `actor_rollout_ref.actor.ppo_mini_batch_size` | 16 / 32 | 12 | yes, topology |
-| `actor.ppo_micro_batch_size_per_gpu` | 2 | 1 | exact shell key | AUTHOR_NOT_PUBLISHED | 2 | no |
+| `actor.ppo_micro_batch_size_per_gpu` | 2 | 1 | exact shell key | AUTHOR_NOT_PUBLISHED | 16 | yes, validated throughput adaptation |
 | `actor.use_kl_loss` | false | true | exact shell key | AUTHOR_NOT_PUBLISHED | false | no |
 | `actor.ppo_max_token_len_per_gpu` | 2048 | 20480 | exact shell key | AUTHOR_NOT_PUBLISHED | 2048 | no |
 | `actor.kl_loss_coef` | 0.001 | 0.001 | exact shell key | AUTHOR_NOT_PUBLISHED | 0.001 | no |
@@ -58,7 +58,7 @@ Git 基线：`53438ec07b804ebd1b670d6fe118199798350505`。
 | `model.enable_gradient_checkpointing` | false | true | exact shell key | AUTHOR_NOT_PUBLISHED | false | no |
 | `actor.fsdp_config.param_offload` | false | true | exact shell key | AUTHOR_NOT_PUBLISHED | false | no |
 | `actor.fsdp_config.optimizer_offload` | false | true | exact shell key | AUTHOR_NOT_PUBLISHED | false | no |
-| `rollout.log_prob_micro_batch_size_per_gpu` | 2 | 2 | exact shell key | AUTHOR_NOT_PUBLISHED | 2 | no |
+| `rollout.log_prob_micro_batch_size_per_gpu` | 2 | 2 | exact shell key | AUTHOR_NOT_PUBLISHED | 32 | yes, validated throughput adaptation |
 | `rollout.max_model_len` | 1024 | 12000 | exact shell key | AUTHOR_NOT_PUBLISHED | 1024 | no |
 | `rollout.max_num_batched_tokens` | 2048 | 12000 | exact shell key | AUTHOR_NOT_PUBLISHED | 2048 | no |
 | `rollout.tensor_model_parallel_size` | 1 | 1 | exact shell key | AUTHOR_NOT_PUBLISHED | 1 | no |
@@ -74,7 +74,7 @@ Git 基线：`53438ec07b804ebd1b670d6fe118199798350505`。
 | `rollout.add_noise_gumbel_softmax` | true | true | exact shell key | method requirement | true | no |
 | `rollout.use_one_sided_gumbel_noise` | true | true | exact shell key | one-sided method | true | no |
 | `rollout.noise_scale` | 1.0 | 1.0 | exact shell key | AUTHOR_NOT_PUBLISHED | 1.0 | no |
-| `rollout.gpu_memory_utilization` | 0.6 | 0.8 | exact shell key | AUTHOR_NOT_PUBLISHED | 0.6 | no |
+| `rollout.gpu_memory_utilization` | 0.6 | 0.8 | exact shell key | AUTHOR_NOT_PUBLISHED | 0.45 | yes, long-batch memory headroom |
 | `rollout.n` | 8 | 8 | exact shell key | low=8; high not separately restated | 8 | no |
 | `rollout.val_kwargs.do_sample` | true | true | exact shell key | AUTHOR_NOT_PUBLISHED | true | no |
 | `rollout.val_kwargs.temperature` | 0.6 | 0.6 | exact shell key | AUTHOR_NOT_PUBLISHED | 0.6 | no |
@@ -87,15 +87,16 @@ Git 基线：`53438ec07b804ebd1b670d6fe118199798350505`。
 | `filter_groups.enable` | true | true | exact shell key | AUTHOR_NOT_PUBLISHED | true | no |
 | `filter_groups.max_num_gen_batches` | 50 | 50 | exact shell key | AUTHOR_NOT_PUBLISHED | 50 | no |
 | `trainer.critic_warmup` | 0 | 0 | exact shell key | AUTHOR_NOT_PUBLISHED | 0 | no |
-| `trainer.val_before_train` | true | true | exact shell key | AUTHOR_NOT_PUBLISHED | true | no |
+| `trainer.logger` | `[console,wandb]` | `[console,wandb]` | exact shell key | AUTHOR_NOT_PUBLISHED | `[console]` | yes, formal logging overhead |
+| `trainer.val_before_train` | true | true | exact shell key | AUTHOR_NOT_PUBLISHED | false | yes, formal startup overhead |
 | `trainer.n_gpus_per_node` | 8 | 8 | exact shell key | 8×A100 | 3 | yes, topology |
 | `trainer.nnodes` | 1 | 1 | exact shell key | AUTHOR_NOT_PUBLISHED | 1 | no |
-| `trainer.save_freq` | 40 | 40 | exact shell key | AUTHOR_NOT_PUBLISHED | 40 | no |
-| `trainer.test_freq` | 10 | 10 | exact shell key | AUTHOR_NOT_PUBLISHED | 10 | no |
+| `trainer.save_freq` | 40 | 40 | exact shell key | AUTHOR_NOT_PUBLISHED | 5000 | yes, disk protection |
+| `trainer.test_freq` | 10 | 10 | exact shell key | AUTHOR_NOT_PUBLISHED | -1 | yes, formal evaluation overhead |
 | `trainer.balance_batch` | true | true | exact shell key | AUTHOR_NOT_PUBLISHED | true | no |
 | `trainer.total_epochs` | 10 | 5 | exact shell key | AUTHOR_NOT_PUBLISHED | 10 | no |
 
-`ppo_epochs=1`、sequence parallel size 1、ref param offload false、seed 17 和 latent marker string `</think>` 未由作者 shell 公开；它们分别来自 vendored upstream default、runner 既有显式默认或 target validation 需要，均标为 `AUTHOR_NOT_PUBLISHED`，没有伪装成作者值。
+`ppo_epochs=1`、sequence parallel size 1、ref param offload false、seed 17 和 latent marker string `</think>` 未由作者 shell 公开；它们分别来自 vendored upstream default、runner 既有显式默认或 target validation 需要，均标为 `AUTHOR_NOT_PUBLISHED`，没有伪装成作者值。Low formal 另外关闭项目自有的 metrics/support/checkpoint/credit probes；Low validation 会在相同 `16/32/0.45` 几何下重新开启全部观测并执行两步 gate。
 
 ## 来源冲突
 

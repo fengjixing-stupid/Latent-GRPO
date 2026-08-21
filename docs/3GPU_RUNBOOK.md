@@ -1,6 +1,6 @@
 # Latent-GRPO 3GPU 运行手册
 
-状态：`TARGET_RUNTIME_EXECUTION_REQUIRED`
+状态：Low `16/32/0.45` 参数集合已在运行时等价的父提交 `8c9ce49` 完成目标机 validation；任何新的当前 HEAD 仍须重新生成 commit-bound acceptance。High 仍为 `TARGET_RUNTIME_EXECUTION_REQUIRED`。
 
 基线提交：`53438ec07b804ebd1b670d6fe118199798350505`
 
@@ -48,7 +48,7 @@ bash scripts/target_machine/03_install_runtime.sh
 bash scripts/target_machine/04_import_check.sh
 ```
 
-最终包已将活动依赖统一为 `flashinfer-python==0.2.5`、`sgl-kernel==0.1.1`，并在安装后运行 `pip check`。包内 `release_validation/LOCAL_RELEASE_ACCEPTANCE.json` 记录静态、单元测试和四个配置 dry-run 的交付验收；L20/CUDA/NCCL 真机验收仍以第 5 节生成的 `acceptance.json` 为准。不要凭经验更换 torch、CUDA、SGLang、FlashInfer 或 kernel 版本。正式配置含 W&B logger，但 wrapper 默认设置 `WANDB_MODE=offline`，无需登录。
+最终包已将活动依赖统一为 `flashinfer-python==0.2.5`、`sgl-kernel==0.1.1`，并在安装后运行 `pip check`。包内 `release_validation/LOCAL_RELEASE_ACCEPTANCE.json` 记录静态、单元测试和四个配置 dry-run 的交付验收；只有其 `git_commit` 等于当前 `git rev-parse HEAD` 时才有效。L20/CUDA/NCCL 真机验收仍以第 5 节生成的 `acceptance.json` 为准。不要凭经验更换 torch、CUDA、SGLang、FlashInfer 或 kernel 版本。Low 正式配置为 console-only；High 正式配置仍含 W&B logger，wrapper 默认设置 `WANDB_MODE=offline`，无需登录。
 
 ## 3. 准备本地模型、数据和输出路径
 
@@ -177,7 +177,7 @@ CHECKPOINT_GATE: PASS
 3GPU_FINAL_GATE: PASS
 ```
 
-机器报告在对应 `$*_VALIDATION_ROOT/acceptance.json`，且 `profile_name` 必须分别为 `3gpu-final-validation` 或 `3gpu-final-high-validation`。SGLang 配置占用率记录作者值：Low `0.6`、High `0.8`。任何一项未证实都会非零退出并打印 `BLOCKED_REASON`、`LOG_PATH`、`NEXT_ACTION`。
+机器报告在对应 `$*_VALIDATION_ROOT/acceptance.json`，且 `profile_name` 必须分别为 `3gpu-final-validation` 或 `3gpu-final-high-validation`。当前 SGLang 配置占用率为 Low `0.45`、High `0.8`。任何一项未证实都会非零退出并打印 `BLOCKED_REASON`、`LOG_PATH`、`NEXT_ACTION`。
 
 ## 6. 对应 validation PASS 后一键启动正式训练
 
@@ -188,7 +188,7 @@ df -h "$EXPERIMENT_ROOT" "$CACHE_ROOT"
 free -h
 ```
 
-正式配置是 `configs/3gpu-final-low.yaml`。它保留作者算法/采样语义，只有 8→3 GPU、`train_batch_size` 64→48、`ppo_mini_batch_size` 16→12 等三卡整除适配，因此名称是 “3-GPU target-runtime / engineering adaptation”，不是 strict paper reproduction。
+正式配置是 `configs/3gpu-final-low.yaml`。它保留作者算法/采样语义，并显式包含 8→3 GPU、`train_batch_size` 64→48、`ppo_mini_batch_size` 16→12 的拓扑适配，以及已通过 validation 的 `actor_micro=16`、`logprob_micro=32`、SGLang `0.45` 吞吐/显存适配，因此不是 strict paper reproduction。Low formal 还关闭 metrics/support/checkpoint/credit probes，使用 `save_freq=5000`、`test_freq=-1`、`val_before_train=false` 和 console-only；完整观测证据由绑定同一 HEAD 的 Low validation 提供。
 
 Low 一键训练：
 
@@ -224,7 +224,7 @@ bash tools/run_3gpu_training.sh \
 
 ## 7. 查看指标、checkpoint、停止与 resume
 
-29 个核心指标和 `train/raw_generated_token_count` 位于训练目录下的 Parquet 表。检查结构：
+29 个核心指标和 `train/raw_generated_token_count` 位于启用 metrics 的 validation/High 训练目录下的 Parquet 表。当前 Low formal 为 observer-off，不保证生成这些 Parquet 指标或 probe sidecar；Low formal 应主要检查 `training.log`、`run_manifest.json`、`resolved_config.yaml`、global step 和 checkpoint。检查启用 metrics 的输出结构：
 
 ```bash
 python scripts/validate_outputs.py --input "$LOW_TRAIN_OUTPUT"
@@ -233,7 +233,7 @@ cat "$LOW_TRAIN_OUTPUT/latest_checkpointed_iteration.txt"
 find "$LOW_TRAIN_OUTPUT" -maxdepth 2 -name latent_grpo_metrics_sidecar.json -print
 ```
 
-Stage 4 是 checkpoint-only，不要为了每 step 出值而改变 probe 频率。正常停止先在训练终端按一次 `Ctrl-C`，等待 Ray worker 退出；若仍有本 job 的进程，再检查 `ray status`，不要杀死其他用户的 Ray 集群。
+Stage 4 在启用 probe 的 profile 中是 checkpoint-only；当前 Low formal 已关闭 probe，不要为了每 step 出值而临时打开或改变频率。正常停止先在训练终端按一次 `Ctrl-C`，等待 Ray worker 退出；若仍有本 job 的进程，再检查 `ray status`，不要杀死其他用户的 Ray 集群。
 
 从已验证 checkpoint resume 使用同一 output、同一 seed、同一配置和资产：
 
