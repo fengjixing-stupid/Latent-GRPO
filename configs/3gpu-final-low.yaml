@@ -13,7 +13,7 @@ batch:
   rollout_n: 8
   mini_prompt_batch: 12
   actor_micro_batch_per_gpu: 16
-  rollout_log_prob_micro_batch_per_gpu: 64
+  rollout_log_prob_micro_batch_per_gpu: 32
   ref_log_prob_micro_batch_per_gpu: 2
   ppo_epochs: 1
 model:
@@ -40,7 +40,7 @@ rollout:
   sequence_parallel_size: 1
   max_model_len: 1024
   max_num_batched_tokens: 2048
-  gpu_memory_utilization: 0.5
+  gpu_memory_utilization: 0.45
   max_topk: 10
   temperature: 0.6
   top_p: 0.95
